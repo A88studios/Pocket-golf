@@ -1,0 +1,2614 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#10261a">
+<title>Pocket Golf</title>
+<style>
+  :root {
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --glass: rgba(12, 28, 20, 0.72);
+    --glass-strong: rgba(10, 24, 17, 0.92);
+    --ink: #f3f7f2;
+    --muted: #b7c8bb;
+    --accent: #ffd34d;
+    --good: #5fe08a;
+    --bad: #ff6b5e;
+    --line: rgba(255, 255, 255, 0.18);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #10261a; color: var(--ink);
+    font: 16px/1.4 var(--font); touch-action: none;
+    -webkit-user-select: none; user-select: none; overscroll-behavior: none; }
+  [hidden] { display: none !important; }
+  canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+  .btn { position: fixed; z-index: 5; min-width: 76px; height: 76px; padding: 0 14px; border-radius: 22px;
+    border: 2px solid var(--line); background: var(--glass); color: var(--ink); font: 700 17px/1 var(--font);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  .btn.on { background: var(--accent); color: #1b1600; border-color: var(--accent); }
+  .btn span { font-size: 14px; }
+  #btnClub { top: calc(env(safe-area-inset-top) + 12px); left: calc(env(safe-area-inset-left) + 12px); min-width: 92px; }
+  #btnMove { top: calc(env(safe-area-inset-top) + 12px); right: calc(env(safe-area-inset-right) + 12px); }
+  #btnBack { top: calc(env(safe-area-inset-top) + 100px); right: calc(env(safe-area-inset-right) + 12px); }
+  #btnMap { top: calc(env(safe-area-inset-top) + 100px); left: calc(env(safe-area-inset-left) + 12px); min-width: 92px; }
+  #app.land #btnMap { top: calc(env(safe-area-inset-top) + 188px); }
+  #btnPull { top: calc(env(safe-area-inset-top) + 188px); left: calc(env(safe-area-inset-left) + 12px); min-width: 92px; }
+  #app.land #btnPull { top: auto; bottom: calc(env(safe-area-inset-bottom) + 12px); }
+  /* Course map: a see-through bird's-eye view over the game, which carries on underneath. */
+  #mapPanel { position: fixed; z-index: 6; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top) + 104px);
+    width: 52%; max-width: 380px; height: 46%; padding: 6px 6px 4px; border-radius: 16px; border: 1px solid var(--line);
+    background: rgba(10, 24, 17, 0.5); display: flex; flex-direction: column; }
+  #app.land #mapPanel { top: calc(env(safe-area-inset-top) + 50px); width: 34%; height: 72%; }
+  #mapPanel.side { left: auto; right: calc(env(safe-area-inset-right) + 10px); transform: none; top: calc(env(safe-area-inset-top) + 96px);
+    width: 30%; max-width: 200px; height: 44%; background: rgba(10, 24, 17, 0.35); padding: 4px; }
+  #app.land #mapPanel.side { width: 22%; height: 70%; top: calc(env(safe-area-inset-top) + 20px); }
+  #mapPanel.side #mapHint { display: none; }
+  #mapCv { flex: 1; width: 100%; min-height: 0; display: block; touch-action: none; }
+  #mapHint { font: 600 12px/1.3 var(--font); color: var(--ink); text-align: center; padding-top: 3px; height: 35px; overflow: hidden; }   /* fixed: changing text never resizes the map */
+  #btnAim { bottom: calc(env(safe-area-inset-bottom) + 12px); left: calc(env(safe-area-inset-left) + 12px); }
+  .zoomBtn { right: calc(env(safe-area-inset-right) + 12px); min-width: 52px; height: 52px; border-radius: 16px; font-size: 28px; padding: 0; }
+  #btnZoomIn { bottom: calc(env(safe-area-inset-bottom) + 136px); }
+  #btnZoomOut { bottom: calc(env(safe-area-inset-bottom) + 76px); }
+  #btnGear { bottom: calc(env(safe-area-inset-bottom) + 12px); right: calc(env(safe-area-inset-right) + 12px);
+    min-width: 52px; height: 52px; border-radius: 16px; font-size: 22px; }
+  #btnRetake { top: calc(env(safe-area-inset-top) + 56px); left: 50%; transform: translateX(-50%);
+    height: 40px; min-width: 0; border-radius: 999px; font-size: 14px; padding: 0 14px; flex-direction: row; }
+
+  #info { position: fixed; z-index: 4; top: calc(env(safe-area-inset-top) + 14px); left: 50%; transform: translateX(-50%);
+    background: var(--glass); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px;
+    font: 600 14px/1.2 var(--font); white-space: nowrap; text-align: center; max-width: calc(100vw - 230px); overflow: hidden; text-overflow: ellipsis; }
+  #info b { color: var(--accent); }
+  #toast { position: fixed; z-index: 6; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 180px); transform: translateX(-50%);
+    max-width: min(92vw, 460px); background: var(--glass-strong); border: 1px solid var(--line); border-radius: 14px;
+    padding: 10px 16px; text-align: center; font-weight: 600; transition: opacity .25s; pointer-events: none; }
+  #btnSet { left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 12px);
+    min-width: 150px; font-size: 22px; letter-spacing: .02em; }
+  #btnSet.on { background: var(--good); border-color: var(--good); color: #062a13; }
+  #holeBanner { position: fixed; z-index: 7; left: 50%; top: 32%; transform: translate(-50%, -50%); pointer-events: none;
+    background: var(--glass-strong); border: 2px solid var(--accent); border-radius: 22px; padding: 14px 28px 16px;
+    text-align: center; transition: opacity .4s; min-width: 220px; }
+  #holeBanner small { display: block; font: 700 14px/1 var(--font); color: var(--muted); letter-spacing: .12em; text-transform: uppercase; }
+  #holeBanner b { display: block; font: 900 64px/1.05 var(--font); color: var(--accent); }
+  #holeBanner span { display: block; font: 700 17px/1.2 var(--font); }
+
+  /* Power: set before the shot. The swing only decides the line. */
+  #powerPanel { position: fixed; z-index: 5; left: calc(env(safe-area-inset-left) + 12px); right: calc(env(safe-area-inset-right) + 76px);
+    bottom: calc(env(safe-area-inset-bottom) + 98px); background: var(--glass); border: 1px solid var(--line); border-radius: 18px;
+    padding: 8px 14px 6px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); max-width: 520px; }
+  #powerPanel .pRow { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font: 700 15px/1.2 var(--font); }
+  #powerPanel .pRow.small { font: 600 12px/1.2 var(--font); color: var(--muted); }
+  #pDist { color: var(--accent); font-size: 17px; }
+  #powerPanel input[type=range] { height: 36px; margin: 2px 0; }
+  #puttNote { font: 600 14px/1.3 var(--font); color: var(--muted); padding: 4px 0; }
+
+  /* After each full shot: what the face and path did. */
+  #shotCard { position: fixed; z-index: 4; top: calc(env(safe-area-inset-top) + 104px); left: 50%; transform: translateX(-50%);
+    width: min(92vw, 400px); background: var(--glass-strong); border: 1px solid var(--line); border-radius: 16px;
+    padding: 10px 12px; display: flex; gap: 12px; align-items: center; pointer-events: none; transition: opacity .3s; }
+  #shotCard svg { width: 84px; height: 84px; flex: none; }
+  #shotCard h3 { margin: 0 0 2px; font-size: 18px; color: var(--accent); }
+  #shotCard p { margin: 0; font-size: 13px; color: var(--muted); }
+  #shotCard p.l1 { color: var(--ink); font-weight: 700; font-size: 14px; }
+
+  /* Phone held sideways. #app gets .land from script rather than a media query, since the page may be turned against the phone. */
+  #app { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; transform-origin: 0 0; overflow: hidden; }
+  #app.turned .overlay { touch-action: pan-x pan-y; }
+  /* Set: everything over the course except the aim arrow fades to 50%, so the ball is the focus. Buttons still work (and leave Set). */
+  #app .btn, #info, .pointer, .pointerLabel, #mapPanel { transition: opacity .25s; }
+  #app.setFocus .btn, #app.setFocus #info { opacity: .5; }   /* the aim arrow at the edge stays bright (user asked) */
+  #app.land #btnSet { top: calc(env(safe-area-inset-top) + 50px); bottom: auto; height: 60px; min-width: 130px; }
+  #app.land #toast { bottom: calc(env(safe-area-inset-bottom) + 8px); }
+  #app.land #holeBanner { top: 45%; }
+  #app.land #btnAim { bottom: auto; top: calc(env(safe-area-inset-top) + 100px); }
+  #app.land #powerPanel { bottom: calc(env(safe-area-inset-bottom) + 12px); left: calc(env(safe-area-inset-left) + 104px); }
+  #app.land #shotCard { top: auto; bottom: calc(env(safe-area-inset-bottom) + 60px); }
+  #app.land #btnRetake { top: auto; bottom: calc(env(safe-area-inset-bottom) + 12px); left: auto; right: calc(env(safe-area-inset-right) + 140px); transform: none; }
+  .pointer { position: fixed; z-index: 4; width: 34px; height: 34px; margin: -17px 0 0 -17px; pointer-events: none; }   /* 34 px: user's pick */
+  .pointer svg { width: 100%; height: 100%; filter: drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
+  .pointerLabel { position: fixed; z-index: 4; font: 700 12px/1 var(--font); transform: translate(-50%, 21px);
+    background: var(--glass); padding: 3px 6px; border-radius: 6px; pointer-events: none; white-space: nowrap; }
+
+  .overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
+    padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px);
+    background: rgba(6, 16, 11, 0.86); overflow-y: auto; touch-action: pan-y; }
+  .overlay > .card { margin: auto; }
+  .card { width: 100%; max-width: 440px; background: var(--glass-strong); border: 1px solid var(--line);
+    border-radius: 20px; padding: 20px; }
+  .card h1 { margin: 0 0 4px; font-size: 28px; }
+  .card h2 { margin: 0 0 8px; font-size: 21px; }
+  .card p { margin: 8px 0; color: var(--muted); }
+  .card p.lead { color: var(--ink); }
+  .row { margin: 16px 0; }
+  .row label.t { display: block; font-weight: 700; margin-bottom: 8px; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .seg button { flex: 1; padding: 12px 6px; border: 0; background: transparent; color: var(--ink); font: 600 15px/1 var(--font); }
+  .seg button.on { background: var(--accent); color: #1b1600; }
+  input[type=range] { width: 100%; accent-color: var(--accent); height: 32px; touch-action: pan-x; }
+  .hint { font-size: 13px; }
+  .big { width: 100%; padding: 16px; border-radius: 14px; border: 0; background: var(--accent); color: #1b1600;
+    font: 800 18px/1 var(--font); margin-top: 8px; }
+  .ghost { width: 100%; padding: 13px; border-radius: 14px; border: 1px solid var(--line); background: transparent;
+    color: var(--ink); font: 700 15px/1 var(--font); margin-top: 8px; }
+  .err { color: var(--bad) !important; font-weight: 600; }
+  .split { display: flex; gap: 8px; } .split > * { flex: 1; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .grid2 button { padding: 12px 10px; border-radius: 12px; border: 1px solid var(--line); background: transparent;
+    color: var(--ink); font: 700 15px/1.2 var(--font); text-align: left; display: flex; justify-content: space-between; gap: 6px; }
+  .grid2 button small { color: var(--muted); font-weight: 600; }
+  .grid2 button.on { background: var(--accent); color: #1b1600; border-color: var(--accent); }
+  .grid2 button.on small { color: #3a3000; }
+  .grid2 button.rec { border-color: var(--good); }
+  table.score { width: 100%; border-collapse: collapse; margin: 10px 0; }
+  table.score td, table.score th { padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: center; }
+  table.score td:first-child, table.score th:first-child { text-align: left; }
+  .howto { margin: 10px 0; padding-left: 20px; color: var(--muted); }
+  .howto li { margin: 4px 0; }
+  .howto b { color: var(--ink); }
+</style>
+</head>
+<body>
+<!-- Everything visible lives in #app, so the whole page can be turned back when the phone rotates against
+     the Screen setting (iPhone won't let a web page lock rotation). -->
+<div id="app">
+<canvas id="c"></canvas>
+
+<button class="btn" id="btnClub" hidden>🏌️<span id="clubLabel">Club</span></button>
+<button class="btn" id="btnMove" hidden>🎯<span id="moveLabel">Move</span></button>
+<button class="btn" id="btnBack" hidden>↩<span>Back</span></button>
+<button class="btn" id="btnMap" hidden>🗺️<span>Map</span></button>
+<button class="btn" id="btnPull" hidden>🔭<span id="pullLabel">Pull back</span></button>
+<div id="mapPanel" hidden><canvas id="mapCv"></canvas><div id="mapHint"></div></div>
+<button class="btn" id="btnAim" hidden>🧭<span id="aimLabel">Aim</span></button>
+<button class="btn zoomBtn" id="btnZoomIn" hidden aria-label="Zoom in">+</button>
+<button class="btn zoomBtn" id="btnZoomOut" hidden aria-label="Zoom out">−</button>
+<button class="btn" id="btnGear" hidden aria-label="Settings">⚙︎</button>
+<button class="btn" id="btnRetake" hidden>↺ Retake shot</button>
+<div id="info" hidden></div>
+<div id="toast" style="opacity:0"></div>
+<div id="holeBanner" hidden></div>
+<div id="shotCard" hidden></div>
+<button class="btn" id="btnSet" hidden>Set</button>
+<div id="powerPanel" hidden>
+  <div id="powerFull">
+    <div class="pRow"><span id="pClub"></span><span id="pDist"></span></div>
+    <input type="range" id="power" min="1" max="100" step="1" aria-label="Power">
+    <div class="pRow small"><span id="pPct"></span><span id="pLie"></span><span id="pPin"></span></div>
+  </div>
+  <div id="puttNote" hidden>Putter: your stroke sets the distance, like Pocket Putt. <span id="pPinPutt"></span></div>
+</div>
+<div class="pointer" id="ballPtr" hidden><svg viewBox="0 0 46 46"><circle cx="23" cy="23" r="21" fill="rgba(10,24,17,.8)" stroke="#fff" stroke-width="2"/><path d="M14 23h16M24 15l8 8-8 8" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+<div class="pointerLabel" id="ballPtrLabel" hidden></div>
+<div class="pointer" id="tgtPtr" hidden><svg viewBox="0 0 46 46"><circle cx="23" cy="23" r="21" fill="rgba(200,150,0,.9)" stroke="#fff" stroke-width="2"/><path d="M14 23h16M24 15l8 8-8 8" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+<div class="pointerLabel" id="tgtPtrLabel" hidden></div>
+<div class="pointer" id="pinPtr" hidden><svg viewBox="0 0 46 46"><circle cx="23" cy="23" r="21" fill="rgba(160,30,30,.85)" stroke="#fff" stroke-width="2"/><path d="M14 23h16M24 15l8 8-8 8" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+<div class="pointerLabel" id="pinPtrLabel" hidden></div>
+
+<!-- Start -->
+<div class="overlay" id="scrStart">
+  <div class="card">
+    <h1>Pocket Golf <small style="font-size:14px;color:var(--muted)">demo</small></h1>
+    <p class="lead">Your phone is the club grip. Hold it in both hands, screen up, and look down at the ball.</p>
+    <ol class="howto">
+      <li><b>Pick a club</b> (top left) and <b>set the power</b> with the slider. The yellow ring shows where it lands.</li>
+      <li>Look down at the ball and tap <b>Set</b>. You're lined up on the target.</li>
+      <li><b>Swing smoothly</b>. Speed doesn't matter, just enough to get through the ball. What matters is the line: <b>don't twist the phone</b> (that turns the face) and <b>don't tip it toward or away from you</b> (that moves the club off the ball's line).</li>
+    </ol>
+    <div class="row">
+      <label class="t">I play</label>
+      <div class="seg" id="segHand"><button data-v="right">Right-handed</button><button data-v="left">Left-handed</button></div>
+    </div>
+    <div class="row">
+      <label class="t">Distances in</label>
+      <div class="seg" id="segUnits"><button data-v="yd">Yards</button><button data-v="m">Metres</button></div>
+    </div>
+    <button class="big" id="btnStart">Play 18 holes</button>
+    <div class="split"><button class="ghost" id="btnFront9">Front 9</button><button class="ghost" id="btnBack9">Back 9</button></div>
+    <div class="row">
+      <label class="t">Or practise one shot</label>
+      <div class="grid2" id="practiceStart"></div>
+    </div>
+    <p class="hint err" id="startErr" hidden></p>
+  </div>
+</div>
+
+<!-- Club bag -->
+<div class="overlay" id="scrBag" hidden>
+  <div class="card">
+    <h2>Your bag</h2>
+    <p class="hint" id="bagHint"></p>
+    <div class="grid2" id="bagGrid"></div>
+    <p class="hint">Numbers are full-power carry for an average golfer. The slider sets how much of that you use.</p>
+    <button class="ghost" id="btnBagClose">Close</button>
+  </div>
+</div>
+
+<!-- Motion access refused (iPhone) -->
+<div class="overlay" id="scrMotion" hidden style="z-index:12">
+  <div class="card">
+    <h2>Motion access is blocked</h2>
+    <p class="lead">Pocket Golf uses your phone's motion sensor to swing the club, but the phone said no without asking you.</p>
+    <p id="motionWhy"></p>
+    <a class="big" id="btnOpenSafari" hidden style="display:block;text-align:center;text-decoration:none">Open in Safari</a>
+    <button class="big" id="btnMotionRetry">Try again</button>
+    <p class="hint err" id="motionErr" hidden></p>
+    <button class="ghost" id="btnMotionCancel">Cancel</button>
+  </div>
+</div>
+
+<!-- Hole done -->
+<div class="overlay" id="scrDone" hidden>
+  <div class="card">
+    <h2 id="doneTitle"></h2>
+    <p class="lead" id="doneText"></p>
+    <table class="score" id="scoreTable"></table>
+    <button class="big" id="btnNext">Next hole</button>
+    <button class="ghost" id="btnDoneRound" hidden>Play 18 holes</button>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="overlay" id="scrSettings" hidden>
+  <div class="card">
+    <h2>Settings</h2>
+    <div class="row">
+      <label class="t">I play</label>
+      <div class="seg" id="segHand2"><button data-v="right">Right-handed</button><button data-v="left">Left-handed</button></div>
+    </div>
+    <div class="row">
+      <label class="t">Distances in</label>
+      <div class="seg" id="segUnits2"><button data-v="yd">Yards</button><button data-v="m">Metres</button></div>
+    </div>
+    <div class="row">
+      <label class="t">Screen</label>
+      <div class="seg" id="segScreen"><button data-v="auto">Auto-rotate</button><button data-v="portrait">Portrait</button><button data-v="landscape">Landscape</button></div>
+      <p class="hint">Portrait or Landscape stops the game turning when you tilt the phone to look around.</p>
+    </div>
+    <div class="row">
+      <label class="t">Arm swing check</label>
+      <div class="seg" id="segArm"><button data-v="on">On</button><button data-v="off">Off</button></div>
+      <p class="hint">On: flipping the phone with your wrist doesn't hit the ball; swing it with your arms. The shot card shows the size of your swing.</p>
+    </div>
+    <div class="row">
+      <label class="t">How strict the swing line is</label>
+      <div class="seg" id="segAcc"><button data-v="relaxed">Relaxed</button><button data-v="normal">Normal</button><button data-v="tour">Tour</button></div>
+      <p class="hint">Relaxed forgives more twist and tip. Tour is real-golf honest.</p>
+    </div>
+    <div class="row">
+      <label class="t">Practise one shot</label>
+      <div class="grid2" id="practiceGrid"></div>
+    </div>
+    <button class="ghost" id="btnRound">Start 18 holes from hole 1</button>
+    <div class="split"><button class="ghost" id="btnRoundF9">Front 9</button><button class="ghost" id="btnRoundB9">Back 9</button></div>
+    <button class="ghost" id="btnRestart">Restart this hole</button>
+    <button class="big" id="btnCloseSettings">Done</button>
+  </div>
+</div>
+
+</div><!-- #app -->
+
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
+<script type="module">
+import * as THREE from 'three';
+const V3 = THREE.Vector3, Q = THREE.Quaternion;
+const $ = id => document.getElementById(id);
+
+// ---------- Settings ----------
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('pocketgolf.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('pocketgolf.' + k, JSON.stringify(v)); } catch (e) {} },
+};
+const settings = {
+  hand: store.get('hand', 'right'),
+  zoom: 1,
+  units: store.get('units', 'yd'),     // 'yd' or 'm': only what is shown; the game runs in metres
+  acc: store.get('acc', 'normal'),
+  armCheck: store.get('armCheck', 'on'),   // 'on': a wrist flip (phone spun in the fingers) doesn't hit the ball
+  power: 1,                            // share of the club's full carry, set with the slider before each shot
+  screen: store.get('screen', 'portrait'),   // 'auto', 'portrait' or 'landscape': only turns if you choose it
+};
+
+// ---------- Screen orientation ----------
+// With Portrait or Landscape chosen, the game must not turn when the phone tilts. Android can lock rotation
+// (in full screen); iPhone can't, so when the phone has rotated against the setting, the whole page (#app) is
+// turned back by the same amount. The game then works as if the screen were at viewAngle() (the motion
+// sensors are read relative to that), on a page appW × appH in size.
+const physAngle = () => {
+  const a = (screen.orientation && typeof screen.orientation.angle === 'number') ? screen.orientation.angle : (window.orientation || 0);
+  return ((a % 360) + 360) % 360;
+};
+// Phones are portrait at angle 0, but many tablets (and computers) are landscape at 0, so ask which it is.
+function naturalPortrait() {
+  const t = screen.orientation && screen.orientation.type;
+  if (!t) return true;
+  return (physAngle() % 180 === 0) === t.startsWith('portrait');
+}
+let lastLand = null;
+function viewAngle() {
+  const p = physAngle(), np = naturalPortrait();
+  const portraitAt = a => (a % 180 === 0) === np;
+  if (!portraitAt(p)) lastLand = p;
+  if (settings.screen === 'portrait') return portraitAt(p) ? p : (np ? 0 : 90);
+  if (settings.screen === 'landscape') return !portraitAt(p) ? p : (lastLand ?? (np ? 90 : 0));
+  return p;
+}
+let appW = window.innerWidth, appH = window.innerHeight;
+function layoutApp() {
+  const W = window.innerWidth, H = window.innerHeight, el = $('app');
+  const r = (((viewAngle() - physAngle()) % 360) + 360) % 360;   // extra turn for the page, clockwise
+  let tf = 'none';
+  if (r === 90) { appW = H; appH = W; tf = `translate(${W}px,0) rotate(90deg)`; }
+  else if (r === 270) { appW = H; appH = W; tf = `translate(0,${H}px) rotate(-90deg)`; }
+  else if (r === 180) { appW = W; appH = H; tf = `translate(${W}px,${H}px) rotate(180deg)`; }
+  else { appW = W; appH = H; }
+  el.style.width = appW + 'px'; el.style.height = appH + 'px'; el.style.transform = tf;
+  el.classList.toggle('turned', r !== 0);
+  el.classList.toggle('land', appW > appH && appH <= 520);
+  if (rendererReady) resize();
+}
+let rendererReady = false;
+async function applyScreenLock() {
+  layoutApp();   // turn the page now; the lock (Android, full screen only) can take a moment to answer
+  const so = screen.orientation;
+  try {
+    if (so && so.lock) { if (settings.screen === 'auto') so.unlock(); else await so.lock(settings.screen); }
+  } catch (e) {}   // only works in full screen, and never on iPhone: layoutApp turns the page instead
+  layoutApp();
+}
+window.addEventListener('orientationchange', () => { layoutApp(); setTimeout(layoutApp, 300); });
+if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', layoutApp);
+const YD = 0.9144;
+// Long distances (shots, the pin): yards or metres.
+function fmtLong(m) { return settings.units === 'yd' ? `${Math.round(m / YD)} yd` : `${Math.round(m)} m`; }
+// Short distances (putts): feet or metres.
+function fmtShort(m) {
+  if (settings.units !== 'yd') return `${m.toFixed(1)} m`;
+  const ft = m / 0.3048;
+  return ft < 10 ? `${ft.toFixed(1)} ft` : `${Math.round(ft)} ft`;
+}
+
+// ---------- Constants (metres, seconds) ----------
+const G = 9.81, BALL_R = 0.02135, CUP_R = 0.054;
+const HEAD_RADIUS = 1.3;         // shoulders to club head: how far the head travels per degree of swing
+const CAM_H = 1.0;               // virtual eye height over the ball at normal zoom
+const ZOOMS = [0.7, 1, 1.5, 2.2, 3.2];
+const eyeH = () => pullH() ?? CAM_H * settings.zoom;
+// ---- Pull-back putting view ----
+// With the putter, Pull back lifts you straight up until the whole putt fits across the screen, from the ball
+// to a little past the hole, centred on the line; the course and the putter keep their real size, so they
+// shrink with the view. Landscape while it's on, so the line runs the long way across the phone.
+const pull = { on: false, prevScreen: null };
+const PULL_PAST = 1.5;           // metres of green shown beyond the hole
+const PULL_SHIFT = 0.1;          // share of the half-screen the view slides toward the hole (ball ~90% out)
+const PULL_MAX = 10 * 0.3048;    // the pull-back view is offered within 10 ft of the pin
+function pullLen() {
+  const [tx, tz] = customAim || hole.cup;
+  return Math.hypot(tx - ball.x, tz - ball.z);
+}
+function pullH() {
+  if (!pull.on) return null;
+  const halfW = ((pullLen() + PULL_PAST) / 2) / 0.8 + 0.3;   // the ball sits about 80% of the way out, clear of the buttons
+  const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * Math.max(camera.aspect, 1e-3);   // across the screen
+  return clamp(halfW / Math.min(tanH, 0.6), CAM_H, 30);
+}
+const CAM_BACK = -0.07;          // eyes a little past the ball: it sits just below centre, clear of the power panel
+const GRIP_SWING = 0.45;
+const SPEED_WINDOW = 50;         // head speed is averaged over this many ms before contact
+const PATH_WINDOW = 70;          // the swing path is measured over this many ms before contact
+const BACKSWING_PUTT = 0.03;     // after Set, the head must go back this far before a hit counts...
+const BACKSWING_FULL = 0.12;     // ...further for a full club, so the tap on Set can't fire a shot
+const MIN_SWING = 1.1;           // m/s of head speed needed to hit a full shot. Above it, speed changes nothing.
+const ARM_MIN_ARC = 0.25;         // metres: smallest swing radius at contact that counts as an arm swing
+const REAL_BACKSWING = 0.3;       // m of head travel (about 13° of phone roll): less than this isn't a full swing
+const SET_SETTLE = 600;          // ms after Set in which contact is a bump, not a stroke
+const LINE_SCALE = 0.5;          // how much of the face and path reaches the ball's line and curve (user: half, for straighter shots)
+const LOOK_DOWN_Y = -0.7;
+const UP = new V3(0, 1, 0);
+// Putting (the Pocket Putt feel)
+const PUTT_DIST = 3.5, MAX_PUTT = 23, CAPTURE_SPEED = 1.25;
+const SLOWMO_AFTER = 0.914, SLOWMO_TIME = 1.0, SLOWMO_SPEED = 0.25;
+
+// How strict the swing is. face: share of the phone's twist that reaches the club face.
+// lat: metres the head moves toward/away from you per radian the phone tips (top edge up or down).
+const ACC = {
+  relaxed: { face: 0.45, lat: 0.22 },
+  normal: { face: 0.7, lat: 0.32 },
+  tour: { face: 1.0, lat: 0.45 },
+};
+
+// Average amateur carry and roll, in yards (converted below). apex: peak height as a share of carry.
+// faceW: how much the start line follows the face rather than the path. curveK: how much it bends.
+// reach: how much further out from you the ball sits than with the putter (metres at normal eye height), as
+// in real life: the driver furthest, irons and wedges halfway, the putter right under your eyes.
+const CLUBS = [
+  { id: 'D',  name: 'Driver',  head: 'driver', carry: 210, roll: 20, apex: 0.13, faceW: 0.85, curveK: 1.25, reach: 0.34 },
+  { id: '3W', name: '3 wood',  head: 'wood',   carry: 195, roll: 15, apex: 0.13, faceW: 0.85, curveK: 1.15, reach: 0.3 },
+  { id: '5W', name: '5 wood',  head: 'wood',   carry: 182, roll: 11, apex: 0.14, faceW: 0.82, curveK: 1.1, reach: 0.28 },
+  { id: '4H', name: '4 hybrid', head: 'hybrid', carry: 172, roll: 9, apex: 0.15, faceW: 0.8, curveK: 1.05, reach: 0.22 },
+  { id: '5i', name: '5 iron',  head: 'iron', carry: 162, roll: 8, apex: 0.15, faceW: 0.75, curveK: 1 },
+  { id: '6i', name: '6 iron',  head: 'iron', carry: 152, roll: 7, apex: 0.16, faceW: 0.75, curveK: 1 },
+  { id: '7i', name: '7 iron',  head: 'iron', carry: 142, roll: 6, apex: 0.17, faceW: 0.75, curveK: 0.95 },
+  { id: '8i', name: '8 iron',  head: 'iron', carry: 132, roll: 5, apex: 0.18, faceW: 0.75, curveK: 0.9 },
+  { id: '9i', name: '9 iron',  head: 'iron', carry: 122, roll: 4, apex: 0.19, faceW: 0.72, curveK: 0.85 },
+  { id: 'PW', name: 'Pitching wedge', head: 'wedge', carry: 112, roll: 3, apex: 0.21, faceW: 0.7, curveK: 0.8 },
+  { id: 'GW', name: 'Gap wedge', head: 'wedge', carry: 98, roll: 2.5, apex: 0.23, faceW: 0.7, curveK: 0.75 },
+  { id: 'SW', name: 'Sand wedge', head: 'wedge', carry: 82, roll: 2, apex: 0.26, faceW: 0.68, curveK: 0.7 },
+  { id: 'LW', name: 'Lob wedge', head: 'wedge', carry: 65, roll: 1.5, apex: 0.3, faceW: 0.65, curveK: 0.65 },
+  { id: 'P',  name: 'Putter',  head: 'putter', putter: true },
+];
+for (const c of CLUBS) if (!c.putter) { c.carryM = c.carry * YD; c.rollM = c.roll * YD; c.reach = c.reach ?? 0.17; }
+const PUTTER = CLUBS.length - 1;
+
+// Surfaces: how fast a rolling ball slows (m/s²), how much landing speed it keeps, how high it hops,
+// and how much distance a shot from that lie keeps.
+const DECEL = { green: 0.6, fringe: 1.2, fairway: 1.8, tee: 1.8, rough: 5, sand: 14 };
+const LANDV = { green: 0.62, fringe: 0.8, fairway: 1, tee: 1, rough: 0.45, sand: 0 };
+const HOP = { green: 0.12, fringe: 0.18, fairway: 0.22, tee: 0.22, rough: 0.08, sand: 0 };
+const LIE = { tee: 1, fairway: 1, fringe: 0.98, green: 1, rough: 0.88, sand: 0.78 };
+const LIE_NAME = { tee: 'Tee', fairway: 'Fairway', fringe: 'Fringe', green: 'Green', rough: 'Rough', sand: 'Bunker' };
+
+// ---------- Holes ----------
+// Tee at the origin, playing toward -z. Ellipses: c centre, r radii, rot turn (radians).
+// fairway: a centreline with a width. green.slope: rise per metre in x and z across the green.
+const HOLES = [
+  { name: 'Opening Drive', par: 4, tee: [0, 0], cup: [6, -330], aim: null,
+    teeBox: [-6, -5, 6, 5],
+    fairway: { pts: [[0, -45], [-4, -150], [2, -250], [5, -302]], w: 34 },
+    green: { c: [6, -331], r: [14, 17], rot: 0.15, slope: [0.008, -0.01] },
+    bunkers: [{ c: [19, -205], r: [7, 11], rot: 0.3 }, { c: [-11, -326], r: [5, 8], rot: -0.2 }, { c: [21, -340], r: [4.5, 6.5], rot: 0.4 }],
+    water: [],
+    h: (x, z) => 0.6 * Math.sin(x / 55 + 1) * Math.cos(z / 70) + 0.5 * Math.sin(z / 45 + 2) },
+  { name: 'Over the Pond', par: 3, tee: [0, 0], cup: [-3, -146], aim: null,
+    teeBox: [-5, -4, 5, 4],
+    fairway: { pts: [[-2, -121], [-3, -127]], w: 26 },
+    green: { c: [-3, -147], r: [13, 15], rot: -0.1, slope: [-0.008, -0.008] },
+    bunkers: [{ c: [13, -142], r: [4.5, 7], rot: 0.2 }, { c: [-18, -152], r: [4, 6], rot: -0.3 }, { c: [-1, -165], r: [7, 3.5], rot: 0 }],
+    water: [{ c: [-1, -100], r: [22, 13], rot: 0.1 }],
+    h: (x, z) => 0.4 * Math.sin(x / 60) * Math.cos(z / 80) },
+  { name: 'The Dogleg', par: 4, tee: [0, 0], cup: [92, -318], aim: [0, -200],
+    teeBox: [-6, -5, 6, 5],
+    fairway: { pts: [[0, -40], [0, -200], [28, -262], [70, -302]], w: 32 },
+    green: { c: [93, -319], r: [15, 14], rot: 0.6, slope: [0.01, -0.006] },
+    bunkers: [{ c: [-19, -212], r: [7, 11], rot: 0.1 }, { c: [24, -192], r: [6, 9], rot: -0.4 }, { c: [80, -333], r: [5, 7], rot: 0.7 }, { c: [107, -305], r: [4, 6], rot: 0.5 }],
+    water: [],
+    h: (x, z) => 0.6 * Math.sin(x / 50) * Math.cos(z / 65 + 1) + 0.4 * Math.sin(z / 40) },
+  // ----- Holes 4-18 -----
+  // Green extras (positions relative to the green's centre, metres): bumps [dx, dz, size, height] (negative
+  // height = a hollow); tier {a: angle of the step's uphill direction, h: height, k: how sharp, off: offset}.
+  { name: 'Rolling Hills', par: 4, tee: [0, 0], cup: [-8, -362], aim: null,
+    teeBox: [-6, -5, 6, 5],
+    fairway: { pts: [[0, -40], [3, -150], [-6, -260], [-8, -335]], w: 32 },
+    green: { c: [-8, -361], r: [14, 16], rot: 0.2, slope: [0.006, -0.01], bumps: [[7, 8, 4, 0.3]] },
+    bunkers: [{ c: [20, -160], r: [7, 10], rot: 0.2 }, { c: [-25, -270], r: [6, 9], rot: -0.3 }, { c: [10, -362], r: [4, 7], rot: 0.3 }],
+    water: [],
+    h: (x, z) => 2.2 * Math.sin(z / 38) * Math.cos(x / 60) + 0.8 * Math.sin(x / 30 + 1) },
+  { name: 'The Long Haul', par: 5, tee: [0, 0], cup: [12, -469], aim: null,
+    teeBox: [-6, -5, 6, 5],
+    fairway: { pts: [[0, -40], [-5, -180], [5, -300], [10, -428]], w: 34 },
+    green: { c: [12, -463], r: [13, 18], rot: 0.1, slope: [0, -0.006], tier: { a: -Math.PI / 2, h: 0.45, k: 2, off: 0 } },
+    bunkers: [{ c: [-24, -300], r: [7, 10], rot: 0.2 }, { c: [30, -420], r: [6, 9], rot: -0.3 }, { c: [-4, -465], r: [4, 8], rot: 0 }, { c: [28, -470], r: [4, 6], rot: 0.2 }],
+    water: [],
+    h: (x, z) => 1.5 * Math.sin(z / 55 + 0.5) * Math.cos(x / 45) + 0.6 * Math.sin(x / 25) },
+  { name: 'Island Green', par: 3, tee: [0, 0], cup: [6, -142], aim: null,
+    teeBox: [-5, -4, 5, 4],
+    fairway: { pts: [[2, -60], [2, -61]], w: 1 },
+    green: { c: [4, -141], r: [13, 12], rot: 0, slope: [0.006, 0.004], bumps: [[-6, 4, 3.5, 0.22]] },
+    bunkers: [],
+    water: [{ c: [3, -110], r: [32, 13], rot: 0 }, { c: [-23, -142], r: [10, 22], rot: 0 }, { c: [31, -142], r: [10, 22], rot: 0 }, { c: [4, -171], r: [32, 9], rot: 0 }],
+    h: (x, z) => 0.3 * Math.sin(x / 40) * Math.cos(z / 50) },
+  { name: 'Uphill Climb', par: 4, tee: [0, 0], cup: [-4, -333], aim: null,
+    teeBox: [-6, -5, 6, 5],
+    fairway: { pts: [[0, -40], [0, -160], [-4, -285]], w: 30 },
+    green: { c: [-4, -331], r: [13, 15], rot: 0, slope: [0.004, -0.022] },
+    bunkers: [{ c: [-19, -318], r: [5, 7], rot: 0 }, { c: [11, -337], r: [4, 6], rot: 0 }, { c: [16, -170], r: [7, 10], rot: 0.2 }],
+    water: [],
+    h: (x, z) => 4.5 * Math.exp(-((x + 4) ** 2 + (z + 331) ** 2) / 75 ** 2) + 0.5 * Math.sin(x / 30) },
+  { name: 'Downhill Drop', par: 3, tee: [0, 0], cup: [3, -168], aim: null,
+    teeBox: [-5, -4, 5, 4],
+    fairway: { pts: [[0, -128], [0, -134]], w: 22 },
+    green: { c: [0, -166], r: [14, 13], rot: 0, slope: [-0.008, -0.006], bumps: [[-8, 4, 4, 0.32]] },
+    bunkers: [{ c: [0, -149], r: [9, 3.5], rot: 0 }, { c: [-17, -168], r: [4, 7], rot: 0 }, { c: [16, -175], r: [4, 6], rot: 0.3 }],
+    water: [],
+    h: (x, z) => 5 * Math.exp(-(x * x + z * z) / 60 ** 2) + 0.4 * Math.sin(x / 35) },
+  { name: 'Lakeside', par: 4, tee: [0, 0], cup: [-95, -328], aim: [0, -195],
+    teeBox: [-6, -5, 6, 5],
+    fairway: { pts: [[0, -40], [0, -190], [-40, -270], [-75, -310]], w: 30 },
+    green: { c: [-95, -326], r: [14, 15], rot: -0.5, slope: [0.004, -0.008], tier: { a: 0, h: 0.4, k: 2, off: 4 } },
+    bunkers: [{ c: [22, -200], r: [7, 10], rot: 0.2 }, { c: [-82, -342], r: [4, 7], rot: -0.4 }, { c: [-110, -312], r: [4, 6], rot: 0.3 }],
+    water: [{ c: [-52, -200], r: [30, 44], rot: 0 }],
+    h: (x, z) => 0.4 * Math.sin(x / 50) * Math.cos(z / 60) },
+  { name: 'The Bowl', par: 4, tee: [0, 0], cup: [0, -320], aim: null,
+    teeBox: [-6, -5, 6, 5],
+    fairway: { pts: [[0, -40], [6, -170], [0, -278]], w: 34 },
+    green: { c: [0, -320], r: [16, 15], rot: 0, slope: [0, 0], bumps: [[0, 0, 9, -0.4]] },
+    bunkers: [{ c: [-18, -312], r: [4, 7], rot: 0 }, { c: [18, -326], r: [4, 7], rot: 0 }, { c: [-20, -175], r: [7, 9], rot: 0 }],
+    water: [],
+    h: (x, z) => 1.2 * Math.sin(z / 45) * Math.cos(x / 50) + 0.5 * Math.sin(x / 28) },
+  { name: 'Sidehill', par: 5, tee: [0, 0], cup: [95, -473], aim: [0, -215],
+    teeBox: [-6, -5, 6, 5],
+    fairway: { pts: [[0, -40], [0, -220], [30, -340], [70, -430]], w: 32 },
+    green: { c: [95, -471], r: [13, 17], rot: 0.5, slope: [-0.018, 0] },
+    bunkers: [{ c: [-18, -225], r: [7, 9], rot: 0 }, { c: [52, -345], r: [6, 9], rot: 0.5 }, { c: [80, -485], r: [4, 7], rot: 0.5 }, { c: [110, -458], r: [4, 6], rot: 0.5 }],
+    water: [],
+    h: (x, z) => 3 * Math.tanh((x - 40) / 60) + 0.6 * Math.sin(z / 40) },
+  { name: 'Postage Stamp', par: 3, tee: [0, 0], cup: [-2, -122], aim: null,
+    teeBox: [-5, -4, 5, 4],
+    fairway: { pts: [[0, -95], [0, -100]], w: 16 },
+    green: { c: [0, -121], r: [9, 10], rot: 0, slope: [0.01, -0.01], bumps: [[5, -5, 3, 0.2]] },
+    bunkers: [{ c: [-13, -119], r: [3.5, 7], rot: 0 }, { c: [13, -123], r: [3.5, 7], rot: 0 }, { c: [0, -134], r: [8, 3], rot: 0 }, { c: [-9, -108], r: [5, 2.5], rot: 0.4 }],
+    water: [],
+    h: (x, z) => 0.5 * Math.sin(x / 30) * Math.cos(z / 40) },
+  { name: 'Ridge Runner', par: 4, tee: [0, 0], cup: [12, -372], aim: null,
+    teeBox: [-6, -5, 6, 5],
+    fairway: { pts: [[0, -40], [-4, -200], [4, -330]], w: 32 },
+    green: { c: [6, -372], r: [17, 14], rot: 0, slope: [0, -0.006], tier: { a: 0, h: 0.5, k: 2.2, off: 0 } },
+    bunkers: [{ c: [-22, -205], r: [6, 9], rot: 0 }, { c: [-12, -380], r: [4, 7], rot: 0 }, { c: [26, -360], r: [4, 6], rot: 0 }],
+    water: [],
+    h: (x, z) => 2 * Math.exp(-((z + 200) ** 2) / 15 ** 2) + 0.6 * Math.sin(x / 35) * Math.cos(z / 50) },
+  { name: 'Double Dogleg', par: 5, tee: [0, 0], cup: [-30, -480], aim: [-28, -185],
+    teeBox: [-6, -5, 6, 5],
+    fairway: { pts: [[0, -40], [-30, -180], [0, -320], [-25, -440]], w: 30 },
+    green: { c: [-30, -478], r: [13, 15], rot: 0, slope: [-0.006, -0.008], bumps: [[6, -6, 3.5, 0.28], [-7, 5, 3, 0.2]] },
+    bunkers: [{ c: [-8, -190], r: [5, 8], rot: 0 }, { c: [-44, -470], r: [4, 7], rot: 0 }, { c: [-16, -490], r: [4, 6], rot: 0 }],
+    water: [{ c: [-14, -255], r: [42, 5], rot: 0.35 }],
+    h: (x, z) => 0.5 * Math.sin(x / 45) * Math.cos(z / 55) },
+  { name: 'Bunker Alley', par: 4, tee: [0, 0], cup: [0, -293], aim: null,
+    teeBox: [-6, -5, 6, 5],
+    fairway: { pts: [[0, -40], [0, -245]], w: 28 },
+    green: { c: [0, -291], r: [15, 13], rot: 0, slope: [0.004, -0.008], bumps: [[-7, 2, 3.5, 0.3]] },
+    bunkers: [{ c: [-17, -150], r: [5, 9], rot: 0 }, { c: [17, -190], r: [5, 9], rot: 0 }, { c: [-16, -230], r: [5, 8], rot: 0 }, { c: [0, -270], r: [10, 3], rot: 0 }, { c: [-18, -295], r: [4, 7], rot: 0 }, { c: [18, -290], r: [4, 7], rot: 0 }],
+    water: [],
+    h: (x, z) => 0.8 * Math.sin(z / 40) * Math.cos(x / 45) },
+  { name: 'The Valley', par: 4, tee: [0, 0], cup: [-3, -344], aim: null,
+    teeBox: [-6, -5, 6, 5],
+    fairway: { pts: [[0, -40], [5, -170], [-3, -300]], w: 34 },
+    green: { c: [-3, -342], r: [14, 15], rot: 0, slope: [0.012, 0.008], bumps: [[6, -7, 3.5, 0.25]] },
+    bunkers: [{ c: [-20, -330], r: [4, 7], rot: 0 }, { c: [14, -352], r: [4, 6], rot: 0 }],
+    water: [],
+    h: (x, z) => -3 * Math.exp(-((z + 170) ** 2) / 50 ** 2) + 2 * Math.exp(-((z + 330) ** 2) / 60 ** 2) + 0.4 * Math.sin(x / 30) },
+  { name: 'The Long One', par: 3, tee: [0, 0], cup: [-6, -188], aim: null,
+    teeBox: [-5, -4, 5, 4],
+    fairway: { pts: [[-3, -140], [-4, -160]], w: 24 },
+    green: { c: [-5, -186], r: [15, 15], rot: 0, slope: [0, -0.006], tier: { a: 2.6, h: 0.4, k: 2, off: 3.5 } },
+    bunkers: [{ c: [-22, -190], r: [4, 7], rot: 0 }, { c: [-5, -205], r: [8, 3], rot: 0 }],
+    water: [{ c: [30, -150], r: [14, 40], rot: 0 }],
+    h: (x, z) => 0.4 * Math.sin(x / 40) * Math.cos(z / 50) },
+  { name: 'Home Hole', par: 5, tee: [0, 0], cup: [-58, -490], aim: [5, -225],
+    teeBox: [-6, -5, 6, 5],
+    fairway: { pts: [[0, -40], [5, -230], [-30, -360], [-55, -425]], w: 32 },
+    green: { c: [-62, -485], r: [15, 16], rot: 0, slope: [0.004, -0.02], bumps: [[-8, -6, 3.5, 0.25]] },
+    bunkers: [{ c: [26, -235], r: [6, 9], rot: 0 }, { c: [-80, -488], r: [4, 7], rot: 0 }, { c: [-44, -500], r: [4, 6], rot: 0 }],
+    water: [{ c: [-60, -452], r: [24, 7], rot: 0 }],
+    h: (x, z) => 1 * Math.sin(z / 50) * Math.cos(x / 55) + 0.5 * Math.sin(x / 30) },
+];
+// Practice spots: a hole and where the ball starts (null = the tee).
+const PRACTICE = [
+  { label: 'Drive', sub: 'Hole 1 tee', hole: 0, at: null },
+  { label: 'Approach', sub: '140 yd', hole: 0, at: [3, -202] },
+  { label: 'Pitch', sub: '50 yd', hole: 0, at: [2, -285] },
+  { label: 'Chip', sub: 'off the green', hole: 0, at: [-14, -316] },
+  { label: 'Bunker', sub: 'greenside', hole: 0, at: [-11, -326] },
+  { label: 'Putt', sub: '6 m', hole: 0, at: [6, -324] },
+  { label: 'Par 3', sub: 'over water', hole: 1, at: null },
+  { label: 'Dogleg', sub: 'Hole 3 tee', hole: 2, at: null },
+];
+
+// ---------- Small helpers ----------
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
+const yawQ = th => new Q().setFromAxisAngle(UP, th);
+const heading = v => Math.atan2(-v.x, -v.z);
+const deg = r => r * 180 / Math.PI;
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+// Normalised radius inside an ellipse: < 1 is inside.
+function ellR(e, x, z) {
+  const dx = x - e.c[0], dz = z - e.c[1], c = Math.cos(e.rot), s = Math.sin(e.rot);
+  const u = dx * c + dz * s, v = -dx * s + dz * c;
+  return Math.sqrt((u / e.r[0]) ** 2 + (v / e.r[1]) ** 2);
+}
+function segDist(px, pz, ax, az, bx, bz) {
+  const ex = bx - ax, ez = bz - az, L2 = ex * ex + ez * ez;
+  const t = L2 ? clamp(((px - ax) * ex + (pz - az) * ez) / L2, 0, 1) : 0;
+  return Math.hypot(px - ax - ex * t, pz - az - ez * t);
+}
+function fairwayDist(hl, x, z) {
+  const p = hl.fairway.pts;
+  if (p.length === 1) return Math.hypot(x - p[0][0], z - p[0][1]);
+  let d = Infinity;
+  for (let i = 0; i < p.length - 1; i++) d = Math.min(d, segDist(x, z, p[i][0], p[i][1], p[i + 1][0], p[i + 1][1]));
+  return d;
+}
+const fringeR = hl => 1 + 1.4 / Math.min(...hl.green.r);
+function holeBounds(hl) {
+  const xs = [hl.tee[0], hl.cup[0], hl.green.c[0] - hl.green.r[0] - 4, hl.green.c[0] + hl.green.r[0] + 4, ...hl.fairway.pts.map(p => p[0])];
+  const zs = [hl.tee[1] + 10, hl.cup[1], hl.green.c[1] - hl.green.r[1] - 4, ...hl.fairway.pts.map(p => p[1])];
+  const m = 55;
+  const x0 = Math.min(...xs) - m, x1 = Math.max(...xs) + m, z0 = Math.min(...zs) - m, z1 = Math.max(...zs) + 25;
+  return { x0, x1, z0, z1, w: x1 - x0, d: z1 - z0 };
+}
+// What the ball is sitting on.
+function surfAt(x, z) {
+  const hl = hole, B = hl.bounds;
+  if (x < B.x0 + 3 || x > B.x1 - 3 || z < B.z0 + 3 || z > B.z1 - 3) return 'ob';
+  for (const w of hl.water) if (ellR(w, x, z) < 1) return 'water';
+  for (const b of hl.bunkers) if (ellR(b, x, z) < 1) return 'sand';
+  const g = ellR(hl.green, x, z);
+  if (g < 1) return 'green';
+  if (g < fringeR(hl)) return 'fringe';
+  const t = hl.teeBox;
+  if (x > t[0] && x < t[2] && z > t[1] && z < t[3]) return 'tee';
+  if (fairwayDist(hl, x, z) < hl.fairway.w / 2) return 'fairway';
+  return 'rough';
+}
+// Ground height: gentle rolls that fade out at the edges, a slightly raised and tilted green,
+// bowls for bunkers and the pond.
+function terRaw(hl, x, z) {
+  const B = hl.bounds;
+  const edge = Math.min(x - B.x0, B.x1 - x, z - B.z0, B.z1 - z);
+  const base = hl.h(x, z) * smooth(0, 30, edge);
+  const gr = ellR(hl.green, x, z);
+  const w = 1 - smooth(1.0, 1.7, gr);
+  // On the green the land's own rolls give way to the green's design (sitting at the land's height at its
+  // centre), so every slope you putt over is one that was put there on purpose.
+  const g = hl.green, gc = g.c;
+  if (hl._bc == null) hl._bc = hl.h(gc[0], gc[1]);
+  let h = base * (1 - w) + hl._bc * w;
+  if (w > 0) {
+    const dx = x - gc[0], dz = z - gc[1];
+    let f = 0.25 + g.slope[0] * dx + g.slope[1] * dz;
+    for (const [bx, bz, r, bh] of g.bumps || []) f += bh * Math.exp(-((dx - bx) ** 2 + (dz - bz) ** 2) / (r * r));
+    if (g.tier) { const t = g.tier, p = dx * Math.cos(t.a) + dz * Math.sin(t.a) - (t.off || 0); f += t.h * 0.5 * (1 + Math.tanh(p / t.k)); }
+    h += w * f;
+  }
+  for (const b of hl.bunkers) { const r = ellR(b, x, z); if (r < 1) h -= 0.4 * (1 - r * r); }
+  for (const p of hl.water) { const r = ellR(p, x, z); if (r < 1) h -= 0.8 * (1 - r * r); }
+  return h;
+}
+const ter = (x, z) => terRaw(hole, x, z);
+function grad(x, z) { const e = 0.02; return [(ter(x + e, z) - ter(x - e, z)) / (2 * e), (ter(x, z + e) - ter(x, z - e)) / (2 * e)]; }
+// Which way the golfer is facing: the top of the screen when the phone is flat, the camera when it is upright.
+function awayDir(q) {
+  const u = new V3(0, 1, 0).applyQuaternion(q), f = new V3(0, 0, -1).applyQuaternion(q);
+  const pu = new V3(u.x, 0, u.z), pf = new V3(f.x, 0, f.z);
+  const w = clamp(1 - pu.length() / 0.5, 0, 1);
+  const a = pu.add(pf.multiplyScalar(w));
+  return a.lengthSq() < 1e-8 ? null : a.normalize();
+}
+function seeded(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+
+// ---------- Renderer & scene ----------
+const canvas = $('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.autoClear = false;
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9fd2f0);
+scene.fog = new THREE.Fog(0xc4e2f2, 260, 1300);
+const camera = new THREE.PerspectiveCamera(62, 1, 0.02, 3000);
+scene.add(new THREE.HemisphereLight(0xdff2ff, 0x3a5a2a, 1.1));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(-30, 80, 40);
+scene.add(sun);
+function resize() {
+  const w = appW || 390, h = appH || 844;   // the page's size as the player sees it (see layoutApp); never 0
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  const focal = Math.max(w, h) / (2 * Math.tan(THREE.MathUtils.degToRad(31)));
+  camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(h / (2 * focal)));
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', layoutApp);
+rendererReady = true;
+layoutApp();
+
+// Beyond the hole: plain rough to the horizon. It has a hole cut where the course is (the course dips below
+// zero in places, and an overlapping plane would show through), and meets the course's edge at height 0.
+const outer = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshLambertMaterial({ color: 0x3a7032 }));
+scene.add(outer);
+function buildOuter(B) {
+  const s = new THREE.Shape();
+  s.moveTo(-4000, -4000); s.lineTo(4000, -4000); s.lineTo(4000, 4000); s.lineTo(-4000, 4000); s.lineTo(-4000, -4000);
+  const h = new THREE.Path();
+  // Shape (u, v) becomes (x = u, z = -v) once laid flat.
+  h.moveTo(B.x0, -B.z0); h.lineTo(B.x0, -B.z1); h.lineTo(B.x1, -B.z1); h.lineTo(B.x1, -B.z0); h.lineTo(B.x0, -B.z0);
+  s.holes.push(h);
+  outer.geometry.dispose();
+  outer.geometry = new THREE.ShapeGeometry(s);
+  outer.geometry.rotateX(-Math.PI / 2);
+}
+
+function dotTexture(fill, stroke) {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const g = cv.getContext('2d');
+  g.beginPath(); g.arc(32, 32, 26, 0, Math.PI * 2); g.fillStyle = fill; g.fill();
+  if (stroke) { g.lineWidth = 6; g.strokeStyle = stroke; g.stroke(); }
+  return new THREE.CanvasTexture(cv);
+}
+function blobTexture() {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const g = cv.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(0,0,0,0.55)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(cv);
+}
+const blobTex = blobTexture();
+
+// Per-hole meshes live here and are rebuilt for each hole.
+const courseGroup = new THREE.Group();
+scene.add(courseGroup);
+let trees = [];      // {x, z, s} for ball strikes
+let builtHole = -1;
+
+function paintGround(hl) {
+  const B = hl.bounds;
+  const px = Math.max(0.25, Math.max(B.w, B.d) / 2048);
+  const W = Math.ceil(B.w / px), H = Math.ceil(B.d / px);
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  const img = g.createImageData(W, H), d = img.data;
+  const rnd = seeded(11);
+  const fr = fringeR(hl);
+  const C = {
+    rough: [58, 112, 50], fwA: [94, 168, 76], fwB: [84, 154, 68], grA: [106, 186, 94], grB: [97, 175, 86],
+    fringe: [80, 150, 66], sand: [228, 212, 162], sandEdge: [196, 178, 128], water: [48, 104, 164],
+  };
+  for (let j = 0; j < H; j++) {
+    const z = B.z0 + (j + 0.5) * px;
+    for (let i = 0; i < W; i++) {
+      const x = B.x0 + (i + 0.5) * px;
+      let c = C.rough, inside = false;
+      for (const w of hl.water) if (ellR(w, x, z) < 1) { c = C.water; inside = true; }
+      if (!inside) for (const b of hl.bunkers) { const r = ellR(b, x, z); if (r < 1) { c = r > 0.9 ? C.sandEdge : C.sand; inside = true; break; } }
+      if (!inside) {
+        const gr = ellR(hl.green, x, z);
+        if (gr < 1) {
+          const c0 = Math.floor((x + 1000) / 2.5) % 2 ? C.grA : C.grB;
+          const e = 0.15, gx = (terRaw(hl, x + e, z) - terRaw(hl, x - e, z)) / (2 * e), gz = (terRaw(hl, x, z + e) - terRaw(hl, x, z - e)) / (2 * e);
+          const k = 1 + clamp(-(gx * 0.6 + gz * 0.9) * 9, -0.22, 0.22);
+          c = [c0[0] * k, c0[1] * k, c0[2] * k];
+        }
+        else if (gr < fr) c = C.fringe;
+        else {
+          const t = hl.teeBox;
+          const onTee = x > t[0] && x < t[2] && z > t[1] && z < t[3];
+          if (onTee || fairwayDist(hl, x, z) < hl.fairway.w / 2) c = Math.floor((z + 1000) / 8) % 2 ? C.fwA : C.fwB;
+        }
+      }
+      const n = 1 + (rnd() - 0.5) * 0.07;
+      const k = (j * W + i) * 4;
+      d[k] = c[0] * n; d[k + 1] = c[1] * n; d[k + 2] = c[2] * n; d[k + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return tex;
+}
+function groundMesh(hl, x0, x1, z0, z1, step, tex, offset) {
+  const B = hl.bounds;
+  const nx = Math.max(1, Math.round((x1 - x0) / step)), nz = Math.max(1, Math.round((z1 - z0) / step));
+  const pos = new Float32Array((nx + 1) * (nz + 1) * 3), uv = new Float32Array((nx + 1) * (nz + 1) * 2), idx = [];
+  let p = 0, q = 0;
+  for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
+    const x = x0 + (x1 - x0) * i / nx, z = z0 + (z1 - z0) * j / nz;
+    pos[p++] = x; pos[p++] = terRaw(hl, x, z); pos[p++] = z;
+    uv[q++] = (x - B.x0) / B.w; uv[q++] = 1 - (z - B.z0) / B.d;
+  }
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const a = j * (nx + 1) + i, b = a + 1, c = a + nx + 1, e = c + 1;
+    idx.push(a, c, b, b, c, e);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  const mat = new THREE.MeshLambertMaterial({ map: tex });
+  if (offset) { mat.polygonOffset = true; mat.polygonOffsetFactor = -1; mat.polygonOffsetUnits = -2; }
+  return new THREE.Mesh(geo, mat);
+}
+
+const trunkGeo = new THREE.CylinderGeometry(0.18, 0.3, 3, 6); trunkGeo.translate(0, 1.5, 0);
+const leafGeo = new THREE.ConeGeometry(2.6, 7, 8); leafGeo.translate(0, 6, 0);
+const trunkMat = new THREE.MeshLambertMaterial({ color: 0x6b4a2b });
+const leafMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+function plantTrees(hl, hi) {
+  const B = hl.bounds, rnd = seeded(97 + hi * 31), list = [];
+  const fr = fringeR(hl), t0 = hl.fairway.pts[0], tN = hl.fairway.pts[hl.fairway.pts.length - 1];
+  const ok = (x, z) => {
+    if (fairwayDist(hl, x, z) < hl.fairway.w / 2 + 16) return false;
+    if (ellR(hl.green, x, z) < fr + 1.2) return false;
+    if (Math.hypot(x - hl.tee[0], z - hl.tee[1]) < 18) return false;
+    if (segDist(x, z, hl.tee[0], hl.tee[1], t0[0], t0[1]) < 20) return false;
+    if (segDist(x, z, tN[0], tN[1], hl.green.c[0], hl.green.c[1]) < hl.fairway.w / 2 + 10) return false;
+    if (hl.bunkers.some(b => ellR(b, x, z) < 1.6) || hl.water.some(w => ellR(w, x, z) < 1.3)) return false;
+    return true;
+  };
+  const area = B.w * B.d, n = Math.round(area / 260);
+  for (let i = 0; i < n * 3 && list.length < n; i++) {
+    const x = B.x0 + 6 + rnd() * (B.w - 12), z = B.z0 + 6 + rnd() * (B.d - 12);
+    if (ok(x, z)) list.push({ x, z, s: 0.75 + rnd() * 0.6, y: terRaw(hl, x, z) });
+  }
+  // A ring outside the hole so the horizon isn't bare.
+  for (let i = 0; i < 260; i++) {
+    const side = rnd() * 4 | 0, f = rnd(), out = 6 + rnd() * 90;
+    const x = side === 0 ? B.x0 - out : side === 1 ? B.x1 + out : B.x0 + f * B.w;
+    const z = side === 2 ? B.z0 - out : side === 3 ? B.z1 + out : B.z0 + f * B.d;
+    list.push({ x, z, s: 0.8 + rnd() * 0.7, y: -0.03 });
+  }
+  const tr = new THREE.InstancedMesh(trunkGeo, trunkMat, list.length);
+  const lf = new THREE.InstancedMesh(leafGeo, leafMat, list.length);
+  const m = new THREE.Matrix4(), col = new THREE.Color();
+  const greens = [0x1f5a2a, 0x2a6e31, 0x24603a, 0x2f7536];
+  list.forEach((t, i) => {
+    m.makeScale(t.s, t.s, t.s).setPosition(t.x, t.y, t.z);
+    tr.setMatrixAt(i, m); lf.setMatrixAt(i, m);
+    lf.setColorAt(i, col.setHex(greens[i % 4]));
+  });
+  courseGroup.add(tr, lf);
+  return list;
+}
+
+const flagGroup = new THREE.Group();
+function buildHole(hi) {
+  const hl = HOLES[hi];
+  if (!hl.bounds) hl.bounds = holeBounds(hl);
+  if (builtHole === hi) return;
+  builtHole = hi;
+  courseGroup.traverse(o => { if (o.geometry && o.geometry !== trunkGeo && o.geometry !== leafGeo) o.geometry.dispose(); if (o.material && o.material.map) o.material.map.dispose(); });
+  courseGroup.clear();
+  const B = hl.bounds, tex = paintGround(hl);
+  map.ground = tex.image; map.key = '';
+  buildOuter(B);
+  courseGroup.add(groundMesh(hl, B.x0, B.x1, B.z0, B.z1, 1, tex, false));
+  // A finer patch over the green, so putts sit exactly on the surface.
+  const gr = Math.max(...hl.green.r) * fringeR(hl) + 3;
+  courseGroup.add(groundMesh(hl, hl.green.c[0] - gr, hl.green.c[0] + gr, hl.green.c[1] - gr, hl.green.c[1] + gr, 0.25, tex, true));
+  // Water surface.
+  for (const p of hl.water) {
+    const m = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshLambertMaterial({ color: 0x3f86c6, transparent: true, opacity: 0.88 }));
+    m.rotation.x = -Math.PI / 2;
+    m.rotation.z = -p.rot;
+    m.scale.set(p.r[0], p.r[1], 1);
+    m.position.set(p.c[0], hl.h(p.c[0], p.c[1]) - 0.12, p.c[1]);
+    courseGroup.add(m);
+  }
+  trees = plantTrees(hl, hi);
+  // Cup and flag.
+  const [hx, hz] = hl.cup, hy = terRaw(hl, hx, hz);
+  const cup = new THREE.Mesh(new THREE.CircleGeometry(CUP_R, 40), new THREE.MeshBasicMaterial({ color: 0x0b0f0c }));
+  cup.rotation.x = -Math.PI / 2; cup.position.set(hx, hy + 0.004, hz);
+  const rim = new THREE.Mesh(new THREE.RingGeometry(CUP_R, CUP_R + 0.006, 40), new THREE.MeshBasicMaterial({ color: 0xf2f2f2 }));
+  rim.rotation.x = -Math.PI / 2; rim.position.set(hx, hy + 0.0045, hz);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 2.2, 8), new THREE.MeshLambertMaterial({ color: 0xffffff }));
+  pole.position.set(hx, hy + 1.1, hz);
+  const fShape = new THREE.Shape(); fShape.moveTo(0, 0); fShape.lineTo(0.55, -0.17); fShape.lineTo(0, -0.36);
+  const flag = new THREE.Mesh(new THREE.ShapeGeometry(fShape), new THREE.MeshLambertMaterial({ color: 0xe53935, side: THREE.DoubleSide }));
+  flag.position.set(hx, hy + 2.2, hz);
+  courseGroup.add(cup, rim, pole, flag);
+  pinDot.position.set(hx, hy + 2.6, hz);
+  // Tee markers.
+  for (const sx of [-3, 3]) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 8), new THREE.MeshLambertMaterial({ color: 0x2f6fe0 }));
+    m.position.set(hl.tee[0] + sx, terRaw(hl, hl.tee[0] + sx, hl.tee[1] + 1) + 0.08, hl.tee[1] + 1);
+    courseGroup.add(m);
+  }
+}
+// Markers that stay a readable size at any distance.
+const pinDot = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTexture('#e53935', '#ffffff'), sizeAttenuation: false, depthTest: false }));
+pinDot.scale.set(0.028, 0.028, 1);
+scene.add(pinDot);
+const tgtDot = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTexture('#ffd34d', '#1b1600'), sizeAttenuation: false, depthTest: false }));
+tgtDot.scale.set(0.022, 0.022, 1);
+scene.add(tgtDot);
+
+// ---------- Ball ----------
+const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 24, 16), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35 }));
+const ballShadow = new THREE.Mesh(new THREE.PlaneGeometry(0.07, 0.07), new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false }));
+ballShadow.rotation.x = -Math.PI / 2;
+const ballDot = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTexture('#ffffff', null), sizeAttenuation: false, depthTest: false, transparent: true, opacity: 0.95 }));
+ballDot.scale.set(0.012, 0.012, 1);
+const teePeg = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.0015, 0.05, 8), new THREE.MeshLambertMaterial({ color: 0xffffff }));
+scene.add(ballMesh, ballShadow, ballDot, teePeg);
+const ball = { x: 0, z: 0, y: 0, vx: 0, vz: 0, hy: 0, vy: 0, state: 'rest', drop: 0, lastX: 0, lastZ: 0, crawl: 0 };
+const teeLift = () => (ball.state === 'rest' && ball.teed) ? (CLUBS[clubIdx].head === 'driver' || CLUBS[clubIdx].head === 'wood' ? 0.03 : 0.008) : 0;
+function placeBallMesh() {
+  const g = ter(ball.x, ball.z);
+  const y = ball.state === 'flight' ? ball.y : g + BALL_R + ball.hy + teeLift() - ball.drop;
+  ballMesh.visible = ball.state !== 'gone' && !(ball.state === 'holed' && ball.drop >= 0.06);
+  ballMesh.position.set(ball.x, y, ball.z);
+  ballShadow.position.set(ball.x + 0.008, g + 0.004, ball.z + 0.006);
+  const above = y - g - BALL_R;
+  ballShadow.visible = ball.drop < 0.01 && ball.state !== 'gone' && above < 3;
+  ballShadow.scale.setScalar(1 + above * 0.6);
+  ballShadow.material.opacity = 1 / (1 + above * 2);
+  const lift = teeLift();
+  teePeg.visible = lift > 0;
+  teePeg.position.set(ball.x, g + lift - 0.025 + 0.002, ball.z);
+  ballDot.position.copy(ballMesh.position);
+  ballDot.visible = ballMesh.visible && camera.position.distanceTo(ballMesh.position) > 7;
+}
+// Shot tracer.
+const TRACE_MAX = 900;
+const traceGeo = new THREE.BufferGeometry();
+traceGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRACE_MAX * 3), 3));
+traceGeo.setDrawRange(0, 0);
+const tracer = new THREE.Line(traceGeo, new THREE.LineBasicMaterial({ color: 0xfff3b0, transparent: true, opacity: 0.9 }));
+tracer.frustumCulled = false;
+scene.add(tracer);
+let traceN = 0;
+function traceReset() { traceN = 0; traceGeo.setDrawRange(0, 0); tracer.material.opacity = 0.9; }
+function tracePush(p) {
+  if (traceN >= TRACE_MAX) return;
+  traceGeo.attributes.position.setXYZ(traceN++, p.x, p.y, p.z);
+  traceGeo.attributes.position.needsUpdate = true;
+  traceGeo.setDrawRange(0, traceN);
+}
+
+// ---------- Clubs ----------
+// Head local axes: +x = face normal (toward the target), +y = up, z = along the face (toe for a right-hander).
+// Origin = centre of the face, on the ground. Every head turns about its hosel at the heel.
+const shaftMat = new THREE.MeshStandardMaterial({ color: 0xd5dae0, metalness: 0.35, roughness: 0.35, transparent: true });
+const steelMat = new THREE.MeshStandardMaterial({ color: 0xc9cfd6, metalness: 0.6, roughness: 0.3, transparent: true });
+const darkMat = new THREE.MeshStandardMaterial({ color: 0x3b4149, metalness: 0.3, roughness: 0.45, transparent: true });
+const crownMat = new THREE.MeshStandardMaterial({ color: 0x15181c, metalness: 0.2, roughness: 0.35, transparent: true });
+const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true });
+const shadowMat = new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false });
+const clubMats = [shaftMat, steelMat, darkMat, crownMat, lineMat];
+function extrudeTop(shape, H, mat) {
+  const g = new THREE.ExtrudeGeometry(shape, { depth: H, bevelEnabled: true, bevelThickness: 0.003, bevelSize: 0.003, bevelSegments: 2, curveSegments: 24 });
+  g.rotateX(-Math.PI / 2);
+  g.translate(-0.003, 0.003, 0);
+  return new THREE.Mesh(g, mat);
+}
+function makeHead(style) {
+  const g = new THREE.Group();
+  let W, H, body, back, face;
+  if (style === 'putter') {
+    W = 0.11; H = 0.026; back = 0.065;
+    const s = new THREE.Shape(); s.moveTo(0, -W / 2); s.lineTo(0, W / 2); s.absellipse(0, 0, back, W / 2, Math.PI / 2, Math.PI * 3 / 2, false);
+    body = extrudeTop(s, H, darkMat);
+    const line = new THREE.Mesh(new THREE.BoxGeometry(back - 0.012, 0.002, 0.004), lineMat);
+    line.position.set(-(back - 0.012) / 2 - 0.004, H + 0.0075, 0);
+    g.add(line);
+  } else if (style === 'driver' || style === 'wood' || style === 'hybrid') {
+    [W, back, H] = style === 'driver' ? [0.118, 0.11, 0.058] : style === 'wood' ? [0.1, 0.075, 0.042] : [0.09, 0.056, 0.036];
+    const s = new THREE.Shape(); s.moveTo(0, -W / 2); s.lineTo(0, W / 2); s.absellipse(-0.006, 0, back, W / 2, Math.PI / 2, Math.PI * 3 / 2, false);
+    body = extrudeTop(s, H, crownMat);
+    const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.002, 12), lineMat);
+    dot.position.set(-0.018, H + 0.0065, 0);
+    g.add(dot);
+  } else {
+    // Iron or wedge blade, seen from above: thin, a little wider at the toe.
+    W = style === 'wedge' ? 0.074 : 0.078; H = 0.05;
+    const s = new THREE.Shape();
+    s.moveTo(0, -W / 2); s.lineTo(0, W / 2); s.quadraticCurveTo(-0.012, W / 2 + 0.006, -0.024, W / 2 - 0.01);
+    s.lineTo(-0.02, -W / 2 + 0.008); s.lineTo(-0.012, -W / 2);
+    body = extrudeTop(s, H, steelMat);
+    if (style === 'wedge') body.material = darkMat;
+  }
+  face = new THREE.Mesh(new THREE.BoxGeometry(0.004, H, W), steelMat);
+  face.position.set(-0.001, H / 2 + 0.003, 0);
+  // A bright top line along the face: what you square up by eye.
+  const top = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.003, W * 0.92), lineMat);
+  top.position.set(-0.001, H + 0.0065, 0);
+  const hosel = new THREE.Mesh(new THREE.CylinderGeometry(0.0055, 0.0055, 0.04, 10), shaftMat);
+  hosel.position.set(-0.016, H + 0.02, 0);
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(0.06, (back || 0.03) + 0.04), W + 0.05), shadowMat);
+  shadow.rotation.x = -Math.PI / 2; shadow.position.set(-0.03, 0.001, 0);
+  g.add(shadow, body, face, top, hosel);
+  g.visible = false;
+  return { g, W, H, hosel, style };
+}
+const HEADS = {};
+for (const s of ['driver', 'wood', 'hybrid', 'iron', 'wedge', 'putter']) HEADS[s] = makeHead(s);
+let clubIdx = 6;    // 7 iron
+const club = () => CLUBS[clubIdx];
+const curHead = () => HEADS[club().head];
+const isPutter = () => !!club().putter;
+const HOSEL_X = -0.016;
+const heelZ = () => (settings.hand === 'right' ? -1 : 1) * (curHead().W / 2 - 0.008);
+const hoselBase = () => new V3(HOSEL_X, 0, heelZ());
+const hoselTop = () => new V3(HOSEL_X, curHead().H + 0.04, heelZ());
+const headBasis = T => new Q().setFromRotationMatrix(new THREE.Matrix4().makeBasis(T, UP, new V3().crossVectors(T, UP)));
+const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.0038, 0.0038, 1, 10), shaftMat);
+const clubGroup = new THREE.Group();
+clubGroup.add(shaft, ...Object.values(HEADS).map(h => h.g));
+// The club is drawn in a second pass on top of the course, so grass never cuts through it.
+const clubScene = new THREE.Scene();
+clubScene.add(new THREE.HemisphereLight(0xdff2ff, 0x3a5a2a, 1.1));
+{ const l = new THREE.DirectionalLight(0xffffff, 1.6); l.position.set(-3, 8, 4); clubScene.add(l); }
+clubScene.add(clubGroup);
+
+// Rings: Move target, Aim target, and the landing spot for the current club and power.
+const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.08, 8, 48), new THREE.MeshBasicMaterial({ color: 0x5fe08a }));
+ring.rotation.x = -Math.PI / 2; ring.visible = false;
+const aimRing = new THREE.Mesh(new THREE.TorusGeometry(1, 0.08, 8, 48), new THREE.MeshBasicMaterial({ color: 0xffd34d }));
+aimRing.rotation.x = -Math.PI / 2; aimRing.visible = false;
+const landRing = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 8, 48), new THREE.MeshBasicMaterial({ color: 0xffd34d, transparent: true, opacity: 0.9 }));
+landRing.rotation.x = -Math.PI / 2; landRing.visible = false;
+scene.add(ring, aimRing, landRing);
+
+// ---------- Game state ----------
+let holeIdx = 0, hole = HOLES[0], strokes = 0;
+HOLES.forEach(h => (h.bounds = holeBounds(h)));
+const scores = [];
+const st = {
+  view: 'ball',        // 'ball' (standing over it), 'scout', or 'flight' (camera follows the ball)
+  aiming: false,       // Move ring showing
+  aimMode: false,      // Aim ring showing
+  atBall: true,
+  hitLocked: false,
+  started: false,
+};
+const origin = new V3();
+const scoutPos = new V3();
+let ringOk = false;
+let customAim = null;
+const aimHit = new V3();
+let aimHitOk = false;
+let practice = null;   // the PRACTICE entry being practised, or null in a round
+let lastShot = null;   // snapshot for Retake
+let shotInfo = null;   // what the last full shot did, for the card
+
+// ---------- Orientation → pose ----------
+// Same model as Pocket Putt. Free: the club hangs from the phone. Set: you're lined up on the target and the
+// head sits behind the ball; from then on the phone's roll swings it along the line, a twist turns the face,
+// and tipping the top edge up or down moves the head away from or toward you (the swing path).
+const Qs = new Q(), Qv = new Q();
+let yawOffset = 0, haveSensor = false, lastSensorT = 0, needAim = true;
+let isSet = false, setBlend = 0;
+let addr = null;
+const stance = { A: new V3(1, 0, 0), T: new V3(0, 0, -1) };
+let prevHead = null;
+
+const _euler = new THREE.Euler(), _q1 = new Q(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)), _z = new V3(0, 0, 1);
+// The screen's angle as the game sees it: the page may be turned against the phone (Screen setting).
+function screenAngle() { return THREE.MathUtils.degToRad(viewAngle()); }
+function sensorQuat(alpha, beta, gamma, out) {
+  const d = THREE.MathUtils.degToRad;
+  _euler.set(d(beta), d(alpha), -d(gamma), 'YXZ');
+  out.setFromEuler(_euler);
+  out.multiply(_q1);
+  out.multiply(new Q().setFromAxisAngle(_z, -screenAngle()));
+  return out;
+}
+function updateQv() { Qv.copy(yawQ(-yawOffset)).multiply(Qs); }
+
+function aimTarget() {
+  if (customAim) return customAim;
+  return (strokes === 0 && hole.aim && !practice?.at) ? hole.aim : hole.cup;
+}
+function setStance() {
+  const [tx, tz] = aimTarget();
+  const D = new V3(tx - origin.x, 0, tz - origin.z);
+  if (D.lengthSq() < 1e-6) D.set(0, 0, -1);
+  D.normalize();
+  stance.T.copy(D);
+  stance.A.copy(settings.hand === 'right' ? new V3().crossVectors(D, UP) : new V3().crossVectors(UP, D));
+}
+// Your feet stay put for the whole game. `homeH` is the way they face, as a raw sensor heading: taken from
+// the phone when the game starts, and again whenever you tap Set (you're looking down at the ball then, so
+// the phone points the way your feet do). Every change of view (after a shot, a new hole, a retake) turns
+// the course to that direction, never to wherever the phone happens to point at the moment, so you never
+// have to shuffle round to find the ball.
+let homeH = null;
+function captureHome() {
+  const a = awayDir(Qs);
+  if (a) homeH = heading(a);
+}
+// Turn the world so `dir` (a direction on the course) lies the way your feet face.
+function faceHome(dir) {
+  if (homeH == null) captureHome();
+  if (homeH == null) return;
+  yawOffset = homeH - heading(dir);
+  updateQv();
+}
+// Recompute the stance for the current target and face it from where you stand.
+function turnStance() {
+  setStance();
+  faceHome(stance.A);
+}
+function becomeSet() {
+  $('app').classList.add('setFocus');
+  setStance();
+  captureHome();   // Set also takes where you're facing now as your new home direction
+  faceHome(stance.A);
+  const inv = Qv.clone().invert();
+  addr = {
+    psi0: heading(stance.A),
+    aLocal: stance.A.clone().applyQuaternion(inv),
+    tLocal: stance.T.clone().applyQuaternion(inv),
+    delta: 0, backswing: false, peak: 0, t0: lastSensorT,
+  };
+  isSet = true;
+  prevHead = null;
+  computePose();
+  const below = pose.P.clone().setY(pose.P.y - 1);
+  lockQ.setFromRotationMatrix(new THREE.Matrix4().lookAt(pose.P, below, stance.A));
+  camLocked = true;
+  $('shotCard').hidden = true;
+  sfx.set();
+  haptic(15);
+}
+function leaveSet() { isSet = false; addr = null; prevHead = null; camLocked = false; $('app').classList.remove('setFocus'); }
+// While Set, any button you tap first takes you out of Set, then does its own job as usual.
+$('app').addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('.btn');
+  if (!b || b.id === 'btnSet' || !isSet) return;
+  leaveSet();
+  updateHud();
+}, true);
+const lockQ = new Q();
+let camLocked = false, camMix = 0;
+
+function canSet() {
+  return st.view === 'ball' && st.atBall && ball.state === 'rest' && !st.hitLocked && !st.aiming && !st.aimMode && $('scrBag').hidden;
+}
+// Lifting the phone to look up takes you out of Set. Measured on the top edge (pitch), not the roll,
+// so a big backswing doesn't count as looking up.
+// Exception: lifting the phone back into the backswing (away from the target) never leaves Set, however high
+// you take it, so a full backswing is safe. Lifting it any other way (straight up to look, or toward the
+// target) still does.
+const BACKSWING_HOLD = THREE.MathUtils.degToRad(15);   // this far into the backswing, Set holds whatever you do
+const DOWNSWING_GRACE = 1500;   // ms after leaving the backswing during which only a near-upright phone leaves Set,
+                                // so a high backswing can come down (top edge still lifted) without dropping out
+// How far the phone has rolled about the away axis since Set: 0 at address, - into the backswing, + toward
+// the target. Measured as a true angle, so a backswing past vertical still reads as a backswing.
+function swingAngle(q) {
+  const tNow = addr.tLocal.clone().applyQuaternion(q);
+  return Math.atan2(tNow.y, tNow.x * stance.T.x + tNow.z * stance.T.z);
+}
+function updateSet() {
+  if (!isSet || !addr) return;
+  const q = Qs.clone().premultiply(yawQ(-yawOffset));
+  if (swingAngle(q) < -BACKSWING_HOLD) { addr.graceUntil = lastSensorT + DOWNSWING_GRACE; return; }
+  const aNow = addr.aLocal.clone().applyQuaternion(q);
+  const fwdY = new V3(0, 0, -1).applyQuaternion(Qs).y;
+  const inGrace = addr.graceUntil && lastSensorT < addr.graceUntil;
+  if ((aNow.y > 0.55 && !inGrace) || fwdY > -0.15) { leaveSet(); updateHud(); }
+}
+function pressSet() {
+  if (isSet) { leaveSet(); updateHud(); return; }
+  if (!canSet()) return;
+  if (new V3(0, 0, -1).applyQuaternion(Qs).y > LOOK_DOWN_Y) { toast('Look down at the ball first', 1500); return; }
+  becomeSet();
+  toggleMap(false);
+  if (!isPutter()) toast(`${club().name} · ${Math.round(settings.power * 100)}% · ${fmtLong(plannedCarry())}`, 1800);
+  updateHud();
+}
+
+const pose = {
+  P: new V3(), H: new V3(), headQ: new Q(), n: new V3(1, 0, 0), sin: 0, ang: 0, lat: 0, elev: 90, pivot: new V3(),
+  gH: new V3(), gQ: new Q(), rH: new V3(), rQ: new Q(),
+};
+// Eyes past the ball (negative) or behind it toward you (positive). Full clubs stand you further from the
+// ball, as in real life; capped so the ball stays on screen when the view is short (phone sideways).
+function camBack() {
+  const c = club();
+  if (c.putter) return CAM_BACK;
+  const h = eyeH(), maxUp = 0.75 * h * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  return Math.min(CAM_BACK + c.reach * settings.zoom, maxUp);
+}
+function computePose() {
+  const fwd = new V3(0, 0, -1).applyQuaternion(Qv);
+  pose.elev = THREE.MathUtils.radToDeg(Math.asin(clamp(-fwd.y, -1, 1)));
+  pose.sin = 0; pose.lat = 0; pose.ang = 0;
+  if (addr) {
+    const aNow = addr.aLocal.clone().applyQuaternion(Qv);
+    if (Math.hypot(aNow.x, aNow.z) > 0.3) addr.delta = wrap(heading(aNow) - addr.psi0);
+    // A backswing past vertical stays at the top rather than reading as coming back down.
+    pose.ang = clamp(swingAngle(Qv), -Math.PI / 2, Math.PI / 2);
+    pose.sin = Math.sin(pose.ang);
+    // Tipping the top edge up (aNow.y > 0) sends the head away from you; down brings it in.
+    pose.lat = isPutter() ? 0 : ACC[settings.acc].lat * clamp(aNow.y, -1, 1);
+    const Tf = stance.T.clone().applyAxisAngle(UP, addr.delta);
+    pose.n.copy(Tf);
+    const rest = -(BALL_R + 0.004);
+    pose.gQ.copy(headBasis(Tf));
+    pose.pivot.set(origin.x + stance.T.x * rest, 0, origin.z + stance.T.z * rest)
+      .add(hoselBase().applyQuaternion(headBasis(stance.T)))
+      .addScaledVector(Tf, HEAD_RADIUS * pose.sin)
+      .addScaledVector(stance.A, pose.lat);
+    pose.gH.copy(pose.pivot).sub(hoselBase().applyQuaternion(pose.gQ));
+    // Full clubs swing up in an arc away from the ball; the putter stays low.
+    const arc = isPutter() ? 0 : HEAD_RADIUS * (1 - Math.cos(pose.ang));
+    pose.gH.y = ter(pose.gH.x, pose.gH.z) + arc;
+  }
+  if (st.view === 'scout') {
+    pose.P.set(scoutPos.x, scoutPos.y + (CAM_H + 0.6) * settings.zoom, scoutPos.z);
+  } else {
+    const cb = camBack();
+    // Pulled back: over the middle of the putt, nudged toward the hole so your ball and putter sit out near
+    // the edge (right for a right-hander) and more of the screen shows the line.
+    const along = pull.on ? (pullLen() + PULL_PAST) / 2 + PULL_SHIFT * (eyeH() * Math.min(0.6, Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect)) : 0.03 * -1;
+    pose.P.set(origin.x - stance.A.x * cb + stance.T.x * along, ter(origin.x, origin.z) + eyeH(),
+               origin.z - stance.A.z * cb + stance.T.z * along);
+  }
+  const side = settings.hand === 'right' ? 1 : -1;
+  const k = clamp((90 - pose.elev) / 60, 0, 1);
+  const h = eyeH();
+  const dir = new V3((-side * 0.005 / h) * (1 - k) + side * 0.07 * k, (camBack() / h) * (1 - k) - 0.2 * k, -1);
+  const reach = h * dir.length();
+  dir.normalize().applyQuaternion(Qv);
+  pose.rH.copy(pose.P).addScaledVector(dir, reach);
+  const up = dir.clone().negate();
+  const n = new V3(-side, 0, 0).applyQuaternion(Qv);
+  n.addScaledVector(up, -n.dot(up)).normalize();
+  pose.rQ.setFromRotationMatrix(new THREE.Matrix4().makeBasis(n, up, new V3().crossVectors(n, up)));
+  if (pull.on && st.view === 'ball') {
+    // Pulled back, the putter waits behind the ball instead of hanging from the (now far away) phone.
+    const rest = -(BALL_R + 0.004);
+    pose.rQ.copy(headBasis(stance.T));
+    pose.rH.set(origin.x + stance.T.x * rest, 0, origin.z + stance.T.z * rest);
+    pose.rH.y = ter(pose.rH.x, pose.rH.z);
+  }
+  if (addr) {
+    pose.H.lerpVectors(pose.rH, pose.gH, setBlend);
+    pose.headQ.slerpQuaternions(pose.rQ, pose.gQ, setBlend);
+  } else {
+    pose.H.copy(pose.rH);
+    pose.headQ.copy(pose.rQ);
+  }
+}
+function clubOpacity(elev) {
+  if (elev >= 45) return 1;
+  if (elev >= 15) return lerp(0.35, 1, (elev - 15) / 30);
+  return 0.35;
+}
+
+function onSensor(alpha, beta, gamma, t) {
+  sensorQuat(alpha, beta, gamma, Qs);
+  haveSensor = true;
+  if (!st.started) return;
+  const dt = lastSensorT ? (t - lastSensorT) / 1000 : 0;
+  lastSensorT = t;
+  if (needAim) { turnStance(); needAim = false; }
+  updateSet();
+  updateQv();
+  computePose();
+  checkStrike(t, dt);
+}
+
+// ---------- Strike detection ----------
+const headHist = [];
+function checkStrike(t, dt) {
+  const bsMin = isPutter() ? BACKSWING_PUTT : BACKSWING_FULL;
+  if (addr && HEAD_RADIUS * pose.sin < -bsMin) addr.backswing = true;
+  if (addr) addr.peak = Math.max(addr.peak, -HEAD_RADIUS * pose.sin);
+  const live = isSet && addr && addr.backswing && setBlend > 0.99 && st.view === 'ball' && st.atBall && !st.hitLocked && ball.state === 'rest';
+  const cur = { p: pose.H.clone(), n: pose.n.clone(), t };
+  if (live) { headHist.push({ a: HEAD_RADIUS * pose.sin, l: pose.lat, t }); if (headHist.length > 24) headHist.shift(); }
+  else headHist.length = 0;
+  if (!live || !prevHead || dt <= 0 || dt > 0.12) { prevHead = live ? cur : null; return; }
+  const b = new V3(ball.x, 0, ball.z);
+  const d = (h, n) => (b.x - h.x) * n.x + (b.z - h.z) * n.z - BALL_R;
+  const d1 = d(prevHead.p, prevHead.n), d2 = d(cur.p, cur.n);
+  if (d1 > 0 && d2 <= 0) {
+    const f = d1 / (d1 - d2);
+    const hc = prevHead.p.clone().lerp(cur.p, f);
+    // Where on the face it met the ball: + toward the toe (away from you), - toward the heel.
+    const offToe = (b.x - hc.x) * stance.A.x + (b.z - hc.z) * stance.A.z;
+    const v = cur.p.clone().sub(prevHead.p).divideScalar(dt);
+    const vn = v.x * cur.n.x + v.z * cur.n.z;
+    const half = curHead().W / 2;
+    // An accidental touch doesn't count, as in real golf: contact right after tapping Set, or a full club
+    // meeting the ball after only a nudge back. The ball stays put, no stroke; swing again.
+    if (t - addr.t0 < SET_SETTLE || (!isPutter() && addr.peak < REAL_BACKSWING)) {
+      if (Math.abs(offToe) < half + BALL_R) {
+        toast('Accidental touch: it doesn\'t count. Take your swing.', 2600);
+        haptic(10);
+      }
+      addr.backswing = false; addr.peak = 0;
+      prevHead = cur;
+      return;
+    }
+    if (isPutter()) {
+      if (Math.abs(offToe) < half + BALL_R * 0.5 && vn > 0.05) {
+        const hv = headSpeed();
+        puttStrike(cur.n, v, hv > 0.05 ? hv : vn, Math.abs(offToe));
+      }
+    } else {
+      const hv = headSpeed();
+      const speed = hv > 0.05 ? hv : vn;
+      if (Math.abs(offToe) > half + BALL_R * 0.6) {
+        toast(offToe > 0 ? 'Missed it: the club passed inside the ball. Keep the phone from tipping down.' : 'Missed it: the club passed outside the ball. Keep the phone from tipping up.', 3200);
+        addr.backswing = false; sfx.whoosh();
+      } else if (speed < MIN_SWING) {
+        toast('A touch more pace to get through the ball. It won\'t add distance.', 2600);
+        addr.backswing = false;
+      } else {
+        const arc = swingArc(t);
+        if (settings.armCheck === 'on' && arc != null && arc < ARM_MIN_ARC) {
+          toast(`That was a wrist flip (${Math.round(arc * 100)} cm swing). Swing the phone with your arms.`, 3200);
+          addr.backswing = false; sfx.whoosh();
+        } else fullStrike(offToe, speed, arc);
+      }
+    }
+  }
+  prevHead = cur;
+}
+// ---- Arm or wrist? ----
+// The tilt sensors can't tell a wrist flip from an arm swing: the phone turns the same either way. The
+// movement sensor can. Swung on your arms, the phone is carried round a big circle and feels a strong pull
+// toward its centre (speed of turn squared × radius); spun in your fingers it turns just as fast but hardly
+// travels. So radius ≈ pull ÷ (turn rate)², measured over the moments before contact.
+const motionHist = [];
+let haveMotion = false;
+function onMotion(e) {
+  const a = e.acceleration, r = e.rotationRate;
+  if (!a || a.x == null || !r || r.alpha == null) return;
+  haveMotion = true;
+  const d = Math.PI / 180;
+  motionHist.push({ t: e.timeStamp || performance.now(), a: Math.hypot(a.x, a.y, a.z), w: Math.hypot(r.alpha * d, r.beta * d, r.gamma * d) });
+  if (motionHist.length > 60) motionHist.shift();
+}
+// Swing radius in metres around contact, or null if this phone doesn't report movement.
+function swingArc(t) {
+  if (!haveMotion) return null;
+  const rs = motionHist.filter(m => m.t > t - 220 && m.t <= t + 20 && m.w > 2.5).map(m => m.a / (m.w * m.w));
+  if (!rs.length) return null;
+  rs.sort((x, y) => x - y);
+  return rs[Math.floor(rs.length / 2)];   // median: one jolt doesn't decide it
+}
+function headSpeed() {
+  const now = headHist[headHist.length - 1];
+  let old = headHist[0];
+  for (const s of headHist) if (now.t - s.t >= SPEED_WINDOW) old = s;
+  const span = (now.t - old.t) / 1000;
+  return span > 0.008 ? (now.a - old.a) / span : 0;
+}
+// Swing path at contact, radians: + = moving away from you as it goes through (in-to-out).
+function swingPath() {
+  const now = headHist[headHist.length - 1];
+  let old = headHist[0];
+  for (const s of headHist) if (now.t - s.t >= PATH_WINDOW) old = s;
+  const da = now.a - old.a, dl = now.l - old.l;
+  return da > 0.005 ? Math.atan2(dl, da) : 0;
+}
+function snapshot() {
+  lastShot = { x: ball.x, z: ball.z, strokes, clubIdx, power: settings.power, customAim: customAim && [...customAim], teed: ball.teed };
+}
+
+// Full shot: power comes from the slider; the swing only decides the line.
+function plannedCarry(ci = clubIdx, p = settings.power) {
+  const c = CLUBS[ci];
+  return c.putter ? 0 : c.carryM * p * (LIE[surfAt(ball.x, ball.z)] ?? 1);
+}
+function fullStrike(offToe, speed, arc = null) {
+  snapshot();
+  const c = club(), acc = ACC[settings.acc];
+  const T = stance.T, A = stance.A;
+  // Face angle, + = open (pointing away from you). Path, + = in-to-out.
+  const face = clamp(addr.delta * acc.face * (settings.hand === 'right' ? -1 : 1), -0.45, 0.45);
+  const path = clamp(swingPath(), -0.45, 0.45);
+  const offN = clamp(offToe / (curHead().W / 2), -1.4, 1.4);
+  const lie = surfAt(ball.x, ball.z);
+  // Off-centre strikes lose distance and (with woods especially) curve back toward the middle: gear effect.
+  const smash = 1 - 0.32 * Math.min(1, Math.abs(offN)) ** 2;
+  const gear = c.head === 'driver' || c.head === 'wood' ? 0.07 : 0.025;
+  // Even a pure strike scatters a little, as real shots do: about ±2.5% in distance and ±0.4° in line.
+  const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) * 1.41;
+  const start = LINE_SCALE * (c.faceW * face + (1 - c.faceW) * path + offN * 0.015) + gauss() * 0.007;
+  const curveRad = LINE_SCALE * ((face - path) - offN * gear);
+  const carry = c.carryM * settings.power * smash * (LIE[lie] ?? 1) * (1 + gauss() * 0.025);
+  const curveM = carry * 0.022 * deg(curveRad) * c.curveK;
+  const D = T.clone().multiplyScalar(Math.cos(start)).addScaledVector(A, Math.sin(start));
+  const P = A.clone().multiplyScalar(Math.cos(start)).addScaledVector(T, -Math.sin(start));
+  const p = settings.power;
+  const H = Math.max(0.6, carry * c.apex * (0.55 + 0.45 * p));
+  const y0 = ter(ball.x, ball.z) + BALL_R + teeLift();
+  const lx = ball.x + D.x * carry + P.x * curveM, lz = ball.z + D.z * carry + P.z * curveM;
+  const yL = ter(lx, lz) + BALL_R;
+  const pk = 1.38, pkU = pk / (pk + 1);
+  Object.assign(flight, {
+    x0: ball.x, z0: ball.z, y0, yL, lx, lz, D, P, C: carry, curve: curveM, H, t: 0,
+    T: 1.15 * Math.sqrt(8 * H / G), a: 0.2 + 0.7 * p, p: pk, m: Math.pow(pkU, pk) * (1 - pkU),
+    rollM: c.rollM * (0.35 + 0.65 * p) * smash,
+  });
+  ball.teed = false;
+  ball.state = 'flight';
+  ball.y = y0;
+  st.hitLocked = true;
+  camLocked = false;
+  strokes++;
+  flightCamIn = 0.45;
+  clearShotFade();
+  traceReset();
+  tracePush(new V3(ball.x, y0, ball.z));
+  // Golfer-relative description for the card.
+  const R = settings.hand === 'right' ? 1 : -1;   // + = right of target, from the golfer's eyes
+  shotInfo = {
+    club: c.name, face: deg(face), path: deg(path), offN, start: deg(start), curve: deg(curveRad), carry, aim: [ball.x + T.x * carry, ball.z + T.z * carry],
+    from: [ball.x, ball.z], T: T.clone(), R, landed: null, arc,
+  };
+  sfx.strike(c.head, smash);
+  haptic(30);
+  updateHud();
+}
+
+// ---------- Putting (unchanged Pocket Putt feel) ----------
+function puttStrike(n, v, vn, off) {
+  snapshot();
+  const vh = new V3(v.x, 0, v.z).normalize();
+  const dir = n.clone().multiplyScalar(0.85).addScaledVector(vh, 0.15).normalize();
+  const sweet = 1 - clamp(off / (curHead().W / 2), 0, 1) * 0.25;
+  const dist = Math.min(MAX_PUTT, vn * PUTT_DIST * sweet);
+  const speed = Math.sqrt(2 * DECEL.green * dist);
+  ball.vx = dir.x * speed; ball.vz = dir.z * speed; ball.hy = 0; ball.vy = 0;
+  ball.state = 'rolling';
+  ball.putt = true;
+  st.hitLocked = true;
+  slowFrom = [ball.x, ball.z];
+  slowT = 0;
+  camLocked = false;
+  strokes++;
+  shotInfo = null;
+  traceReset();
+  sfx.putt(speed);
+  haptic(25 + Math.round(dist / MAX_PUTT * 35));
+  toast(`${fmtShort(dist)} putt`, 1200);
+  updateHud();
+}
+
+// Vibration (iPhone: a hidden switch-style checkbox gives a tick on Safari 18+).
+const hapticSwitch = (() => {
+  if (navigator.vibrate) return null;
+  const label = document.createElement('label');
+  label.style.cssText = 'position:fixed;left:-99px;top:0;opacity:0;pointer-events:none';
+  label.ariaHidden = 'true';
+  const input = document.createElement('input');
+  input.type = 'checkbox'; input.setAttribute('switch', ''); input.tabIndex = -1;
+  label.appendChild(input);
+  document.body.appendChild(label);
+  return label;
+})();
+function haptic(ms) {
+  try { if (navigator.vibrate) navigator.vibrate(ms); else if (hapticSwitch) hapticSwitch.click(); } catch (e) {}
+}
+
+// ---------- Ball flight ----------
+// A shaped flight rather than raw aerodynamics, so every club carries exactly its number on a pure strike:
+// it slows as it goes (drag), peaks past halfway and comes down steeper than it went up, and bends
+// sideways more and more toward the end (spin).
+const flight = {};
+let flightCamIn = 0;
+function flightPos(u, out) {
+  const F = flight;
+  const fu = u * (1 + F.a) / (1 + F.a * u);
+  const s = F.C * fu, c = F.curve * fu * fu;
+  out.x = F.x0 + F.D.x * s + F.P.x * c;
+  out.z = F.z0 + F.D.z * s + F.P.z * c;
+  out.y = F.y0 + (F.yL - F.y0) * u + F.H * Math.pow(u, F.p) * (1 - u) / F.m;
+  return out;
+}
+const _fp = new V3();
+function stepFlight(dt) {
+  const F = flight;
+  F.t += dt;
+  const u = Math.min(1, F.t / F.T);
+  flightPos(u, _fp);
+  ball.x = _fp.x; ball.z = _fp.z; ball.y = _fp.y;
+  tracePush(_fp);
+  // Trees: a ball flying into the branches drops almost straight down.
+  for (const tr of trees) {
+    const dx = ball.x - tr.x, dz = ball.z - tr.z;
+    if (Math.abs(dx) > 3.5 || Math.abs(dz) > 3.5) continue;
+    const yRel = ball.y - tr.y, s = tr.s;
+    if (yRel < 2.2 * s || yRel > 9.4 * s) continue;
+    const rad = 2.6 * s * (1 - (yRel - 2.5 * s) / (7 * s));
+    if (Math.hypot(dx, dz) < Math.max(0.6, rad * 0.85)) {
+      const sp = 1.5;
+      const L = Math.hypot(dx, dz) || 1;
+      ball.vx = dx / L * sp; ball.vz = dz / L * sp;
+      ball.hy = ball.y - ter(ball.x, ball.z) - BALL_R; ball.vy = 0;
+      ball.state = 'rolling';
+      if (shotInfo) shotInfo.tree = true;
+      sfx.tree();
+      toast('Into the trees!', 1500);
+      return;
+    }
+  }
+  if (u >= 1) land();
+}
+function land() {
+  const F = flight;
+  const surf = surfAt(ball.x, ball.z);
+  if (shotInfo) shotInfo.landed = [ball.x, ball.z];
+  if (surf === 'water' || surf === 'ob') { penalty(surf); return; }
+  if (Math.hypot(ball.x - hole.cup[0], ball.z - hole.cup[1]) < CUP_R) { holed(); return; }
+  const fp1 = 1 / (1 + F.a);
+  const hx = (F.D.x * F.C + F.P.x * 2 * F.curve) * fp1, hz = (F.D.z * F.C + F.P.z * 2 * F.curve) * fp1;
+  const L = Math.hypot(hx, hz) || 1;
+  const v = Math.sqrt(2 * DECEL.fairway * F.rollM) * LANDV[surf];
+  ball.vx = hx / L * v; ball.vz = hz / L * v;
+  const descent = ((F.yL - F.y0) - F.H / F.m) / F.T;   // negative: coming down
+  ball.hy = 0; ball.vy = -descent * HOP[surf];
+  ball.state = 'rolling';
+  ball.putt = false;
+  sfx.land(surf);
+}
+
+// ---------- Rolling ----------
+function stepRoll(dt) {
+  if (ball.state !== 'rolling') return;
+  const surf = surfAt(ball.x, ball.z);
+  if (surf === 'water' || surf === 'ob') { penalty(surf); return; }
+  if (ball.hy > 0 || ball.vy > 0) {
+    // Hopping or falling.
+    ball.vy -= G * dt; ball.hy += ball.vy * dt;
+    if (ball.hy <= 0) {
+      ball.hy = 0;
+      const nv = -ball.vy * 0.3 * (surf === 'sand' ? 0 : 1);
+      ball.vy = nv > 0.4 ? nv : 0;
+      const keep = surf === 'sand' ? 0 : surf === 'rough' ? 0.55 : 0.85;
+      ball.vx *= keep; ball.vz *= keep;
+    }
+    ball.x += ball.vx * dt; ball.z += ball.vz * dt;
+    return;
+  }
+  const [gx, gz] = grad(ball.x, ball.z);
+  const k = (5 / 7) * G;
+  ball.vx -= k * gx * dt; ball.vz -= k * gz * dt;
+  let sp = Math.hypot(ball.vx, ball.vz);
+  const slopeAcc = k * Math.hypot(gx, gz);
+  const decel = DECEL[surf] ?? 2;
+  if (sp > 0) { const ns = Math.max(0, sp - decel * dt); ball.vx *= ns / sp; ball.vz *= ns / sp; sp = ns; }
+  ball.crawl = sp < 0.03 ? ball.crawl + dt : 0;
+  if ((sp < 0.012 && slopeAcc < decel) || ball.crawl > 1.5) { ball.vx = ball.vz = 0; ball.crawl = 0; stopBall(); return; }
+  ball.lastX = ball.x; ball.lastZ = ball.z;
+  ball.x += ball.vx * dt; ball.z += ball.vz * dt;
+  if (!ball.putt && Math.random() < 0.15) tracePush(new V3(ball.x, ter(ball.x, ball.z) + BALL_R, ball.z));
+  const cd = Math.hypot(ball.x - hole.cup[0], ball.z - hole.cup[1]);
+  if (cd < CUP_R - 0.008) {
+    if (sp < CAPTURE_SPEED) holed();
+    else { ball.vx *= 0.985; ball.vz *= 0.985; }
+  }
+}
+function holed() {
+  // Into the cup on the side it came in from, clear of the flagstick, then it drops out of sight.
+  const dx = ball.x - hole.cup[0], dz = ball.z - hole.cup[1], L = Math.hypot(dx, dz) || 1;
+  ball.x = hole.cup[0] + dx / L * 0.03; ball.z = hole.cup[1] + dz / L * 0.03;
+  ball.state = 'holed'; ball.vx = ball.vz = 0; ball.hy = 0; ball.vy = 0; ball.drop = 0;
+  sfx.cup();
+  finishCard();
+  const tok = holeToken;
+  setTimeout(() => { if (tok === holeToken) holeDone(); }, st.view === 'flight' ? 2200 : 1100);
+}
+function penalty(kind) {
+  ball.state = 'gone';
+  strokes += 1;
+  if (kind === 'water') sfx.splash();
+  toast(kind === 'water' ? 'Splash! In the water: 1 stroke penalty. Play again from where you hit it.' : 'Out of bounds: 1 stroke penalty. Play again from where you hit it.', 3200);
+  finishCard(kind);
+  ball.returnTo = lastShot;
+  walkIn = 2.2;
+  updateHud();
+}
+function stopBall() {
+  ball.state = 'rest';
+  ball.teed = false;
+  finishCard();
+  if (strokes >= 10) { toast('10 strokes: picking up.', 2000); const tok = holeToken; setTimeout(() => { if (tok === holeToken) holeDone(); }, 1200); return; }
+  walkIn = st.view === 'flight' ? 1.6 : 0.5;
+}
+// Walk to the ball (or back to where you hit from, after a penalty), facing the pin.
+let walkIn = 0;
+const SHOT_SHOW = 2.0, SHOT_FADE = 0.6;   // seconds the last shot's line and card stay, then fade over
+let shotFadeIn = 0, shotFade = 0;
+function stepShotFade(dt) {
+  if (shotFadeIn > 0) { shotFadeIn -= dt; if (shotFadeIn <= 0) { shotFade = SHOT_FADE; $('shotCard').style.opacity = 0; } }
+  if (shotFade > 0) {
+    shotFade -= dt;
+    tracer.material.opacity = 0.9 * Math.max(0, shotFade / SHOT_FADE);
+    if (shotFade <= 0) { traceReset(); $('shotCard').hidden = true; }
+  }
+}
+function clearShotFade() { shotFadeIn = shotFade = 0; tracer.material.opacity = 0.9; }
+function walkToBall(dt) {
+  if (walkIn <= 0) return;
+  walkIn -= dt;
+  if (walkIn > 0) return;
+  if (ball.state === 'gone' && ball.returnTo) {
+    const r = ball.returnTo;
+    ball.x = r.x; ball.z = r.z; ball.teed = r.teed; ball.state = 'rest'; ball.hy = ball.vy = 0;
+    ball.returnTo = null;
+  }
+  if (ball.state !== 'rest') return;
+  readyAtBall(true);
+  toast(isPutter() ? 'On the green. Look down, line up and tap Set.' : 'Set the power, look down and tap Set', 2600);
+}
+function readyAtBall(pickClub) {
+  resetMapView();   // every new shot starts from the overview
+  customAim = null;
+  shotFadeIn = SHOT_SHOW;
+  goToBall();
+  turnStance();
+  st.hitLocked = false;
+  leaveSet();
+  setBlend = 0;
+  if (pickClub) autoClub();
+  updateHud();
+}
+// Suggest the shortest club whose full carry still reaches the target (150 to go: the 160 club), or the
+// longest club if nothing does (driver on the tee, 3 wood elsewhere). Putter on the green.
+function autoClub() {
+  const surf = surfAt(ball.x, ball.z);
+  const [tx, tz] = aimTarget();
+  const d = Math.hypot(tx - ball.x, tz - ball.z);
+  if (surf === 'green' || (surf === 'fringe' && d < 18)) { clubIdx = PUTTER; return; }
+  const lie = LIE[surf] ?? 1;
+  let pick = -1;
+  for (let i = PUTTER - 1; i >= 0; i--) {
+    if (CLUBS[i].id === 'D' && surf !== 'tee') continue;
+    if (CLUBS[i].carryM * lie >= d) { pick = i; break; }
+  }
+  if (pick < 0) pick = surf === 'tee' ? 0 : 1;
+  clubIdx = pick;
+  // Always full power to start: matching the distance is the player's job (club and slider).
+  settings.power = 1;
+}
+
+// ---------- Buttons ----------
+function goToBall() {
+  st.view = 'ball'; st.atBall = true; st.aiming = false;
+  origin.set(ball.x, ter(ball.x, ball.z), ball.z);
+  setStance();
+}
+function pressClub() {
+  if (ball.state !== 'rest' || st.view === 'flight') return;
+  if (st.view !== 'ball' || !st.atBall || st.aiming || st.aimMode) {
+    st.aimMode = false;
+    goToBall();
+    updateHud();
+    return;
+  }
+  leaveSet();
+  openBag();
+}
+function openBag() {
+  const g = $('bagGrid');
+  g.innerHTML = '';
+  const surf = surfAt(ball.x, ball.z), lie = LIE[surf] ?? 1;
+  const [tx, tz] = aimTarget();
+  const d = Math.hypot(tx - ball.x, tz - ball.z);
+  let rec = -1;
+  for (let i = PUTTER - 1; i >= 0; i--) if (CLUBS[i].carryM * lie >= d) { rec = i; break; }
+  if (surf === 'green') rec = PUTTER;
+  $('bagHint').textContent = `${customAim ? 'Target' : 'Pin'} ${fmtLong(d)} · lie: ${LIE_NAME[surf] || surf}${lie < 1 ? ` (${Math.round((1 - lie) * 100)}% shorter)` : ''}`;
+  CLUBS.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.innerHTML = `${c.name}<small>${c.putter ? 'stroke' : fmtLong(c.carryM)}</small>`;
+    b.classList.toggle('on', i === clubIdx);
+    b.classList.toggle('rec', i === rec && i !== clubIdx);
+    b.onclick = () => { chooseClub(i); $('scrBag').hidden = true; };
+    g.appendChild(b);
+  });
+  $('scrBag').hidden = false;
+}
+// Switching clubs keeps the same landing spot if the new club can reach it.
+// A new club starts at full power; the slider is yours to set.
+function chooseClub(i) {
+  clubIdx = i;
+  settings.power = 1;
+  updateHud();
+}
+function pressAim() {
+  if (ball.state !== 'rest' || st.view === 'flight') return;
+  if (!st.aimMode) {
+    if (st.view !== 'ball' || !st.atBall) goToBall();
+    st.aiming = false; st.aimMode = true;
+    leaveSet();
+    updateHud();
+    toast(isPutter() ? 'Point the ring where you want to roll it, then tap Lock' : `Point the ring where you want it to land (up to ${fmtLong(plannedCarry(clubIdx, 1))}), then tap Lock`, 3200);
+    return;
+  }
+  if (!aimHitOk) { toast('Point the ring at the ground', 1500); return; }
+  st.aimMode = false;
+  const toCup = Math.hypot(aimHit.x - hole.cup[0], aimHit.z - hole.cup[1]);
+  if (toCup < (isPutter() ? 0.5 : 3) && !isPutter() && plannedCarry(clubIdx, 1) >= Math.hypot(hole.cup[0] - ball.x, hole.cup[1] - ball.z)) {
+    customAim = null;
+  } else if (toCup < 0.5) customAim = null;
+  else customAim = [aimHit.x, aimHit.z];
+  const dAim = Math.hypot(aimHit.x - ball.x, aimHit.z - ball.z);
+  toast(isPutter() ? (customAim ? 'Aim locked. Look down at the ball and tap Set.' : 'Aiming at the pin. Look down and tap Set.')
+    : `${customAim ? 'Aim locked' : 'Aiming at the pin'}: ${fmtLong(dAim)} away. Set the power, then look down and tap Set.`, 3000);
+  turnStance();
+  updateHud();
+}
+function pressMove() {
+  if (ball.state !== 'rest' || st.view === 'flight') return;
+  st.aimMode = false;
+  if (!st.aiming) {
+    st.aiming = true; leaveSet(); prevHead = null;
+    updateHud();
+    toast('Point the ring anywhere on the course, then tap Go', 2600);
+    return;
+  }
+  if (!ringOk) { toast('Point the ring at the course', 1500); return; }
+  st.view = 'scout'; st.aiming = false;
+  scoutPos.copy(ring.position);
+  updateHud();
+  toast('Tap Move to go somewhere else, or Back to return to your ball', 2600);
+}
+// Move stays Move once you've moved, so you can hop round the course as often as you like; Back (under it)
+// always returns you to your ball.
+function pressBack() {
+  st.aiming = false;
+  if (st.view === 'scout') st.view = 'ball';
+  updateHud();
+}
+function pressRetake() {
+  if (!lastShot || $('scrDone').hidden === false) return;
+  const r = lastShot;
+  ball.x = r.x; ball.z = r.z; ball.teed = r.teed; ball.state = 'rest'; ball.hy = ball.vy = ball.vx = ball.vz = 0; ball.drop = 0; ball.returnTo = null;
+  strokes = r.strokes; walkIn = 0; slowT = 0; slowFrom = null; flightCamIn = 0;
+  traceReset();
+  $('shotCard').hidden = true;
+  readyAtBall(false);
+  clubIdx = r.clubIdx; settings.power = r.power; customAim = r.customAim;
+  turnStance();
+  lastShot = null;
+  updateHud();
+  toast('Same shot again', 1200);
+}
+
+function updateHud() {
+  $('btnMove').classList.toggle('on', st.aiming);
+  $('btnAim').classList.toggle('on', st.aimMode);
+  $('aimLabel').textContent = st.aimMode ? 'Lock' : 'Aim';
+  $('moveLabel').textContent = st.aiming ? 'Go' : 'Move';
+  $('clubLabel').textContent = club().putter ? 'Putter' : club().id === 'D' ? 'Driver' : club().name.replace(' wedge', ' W').replace('Pitching W', 'PW').replace('Gap W', 'GW').replace('Sand W', 'SW').replace('Lob W', 'LW');
+  const surf = surfAt(ball.x, ball.z);
+  $('info').innerHTML = (practice ? `Practice · ${practice.label}` : `Hole <b>${holeIdx + 1}</b>${round.to - round.from === 17 ? '/18' : ` (${round.name})`} · Par ${hole.par}`) + ` · Shot <b>${strokes + 1}</b>`;
+  // Power panel
+  const pin = Math.hypot(hole.cup[0] - ball.x, hole.cup[1] - ball.z);
+  $('powerFull').hidden = isPutter(); $('puttNote').hidden = !isPutter();
+  if (isPutter()) $('pPinPutt').textContent = `Pin ${fmtShort(pin)}.`;
+  else {
+    $('pClub').textContent = club().name;
+    $('pDist').textContent = `Carry ${fmtLong(plannedCarry())}`;
+    $('power').value = Math.round(settings.power * 100);
+    $('pPct').textContent = `Power ${Math.round(settings.power * 100)}%`;
+    const lie = LIE[surf] ?? 1;
+    $('pLie').textContent = LIE_NAME[surf] ? `${LIE_NAME[surf]}${lie < 1 ? ` −${Math.round((1 - lie) * 100)}%` : ''}` : '';
+    $('pPin').textContent = `Pin ${fmtLong(pin)}`;
+  }
+}
+let toastTimer = 0;
+function toast(msg, ms = 2000) {
+  const el = $('toast'); el.textContent = msg; el.style.opacity = 1;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (el.style.opacity = 0), ms);
+}
+function updateFloating() {
+  const el = $('btnSet');
+  el.hidden = !(st.started && ((isSet && !st.hitLocked) || canSet()));
+  el.classList.toggle('on', isSet);
+  el.textContent = isSet ? 'Set ✓' : 'Set';
+  $('powerPanel').hidden = !(st.started && canSet() && !isSet);
+  $('btnRetake').hidden = !(st.started && lastShot && $('scrDone').hidden && !(isSet && !st.hitLocked) && ball.state !== 'holed');
+  const free = st.view !== 'flight';
+  for (const id of ['btnClub', 'btnAim', 'btnMove', 'btnZoomIn', 'btnZoomOut', 'btnMap']) $(id).hidden = !st.started || !free;
+  // Pull back is offered for putts within PULL_MAX of the pin (user's choice); it drops when the next putt is longer.
+  const pullOk = isPutter() && Math.hypot(ball.x - hole.cup[0], ball.z - hole.cup[1]) <= PULL_MAX;
+  if (pull.on && (!pullOk || !st.started) && ball.state === 'rest') setPull(false);
+  $('btnPull').hidden = !st.started || !free || !(pullOk || pull.on) || st.view === 'scout';
+  $('btnPull').classList.toggle('on', pull.on);
+  $('pullLabel').textContent = pull.on ? 'Close up' : 'Pull back';
+  $('btnZoomIn').hidden = $('btnZoomOut').hidden = $('btnZoomIn').hidden || pull.on;
+  $('btnBack').hidden = !st.started || st.view !== 'scout';
+  // While a full shot is in the air (ball cam), a narrow map slides in on the right so you can see where it's
+  // going; it leaves again when you're back over the ball. The map you open yourself sits in the middle.
+  const flying = st.view === 'flight';
+  const panel = $('mapPanel');
+  panel.hidden = !(map.open || flying);
+  panel.classList.toggle('side', flying);
+  // The shot card sits where the map opens: the map wins while it's open.
+  $('shotCard').style.visibility = map.open && !flying ? 'hidden' : '';
+}
+
+// What the shot did: a small diagram (path arrow, face line) and words.
+function finishCard(kind) {
+  const s = shotInfo;
+  if (!s) return;
+  shotInfo = null;
+  const R = s.R;
+  const Tv = s.T, Rv = new V3().crossVectors(Tv, UP);          // right of the target line, as you look down it
+  const end = [ball.x, ball.z];
+  const dx = end[0] - s.from[0], dz = end[1] - s.from[1];
+  const along = dx * Tv.x + dz * Tv.z, side = dx * Rv.x + dz * Rv.z;
+  const carryDone = s.landed ? Math.hypot(s.landed[0] - s.from[0], s.landed[1] - s.from[1]) : null;
+  const fr = s.face * R, pr = s.path * R;   // + = to the right, for the diagram
+  // Shape names are golfer-relative: + start/curve is the open side (push, fade) for either hand.
+  const shape = (() => {
+    const st_ = Math.abs(s.start) < 1.5 ? '' : s.start > 0 ? 'Push' : 'Pull';
+    const a = Math.abs(s.curve);
+    const bend = a < 1.5 ? '' : s.curve > 0 ? (a > 6 ? 'slice' : 'fade') : (a > 6 ? 'hook' : 'draw');
+    if (!st_ && !bend) return Math.abs(s.offN) < 0.35 ? 'Pure strike' : 'Straight';
+    if (!st_) return bend.charAt(0).toUpperCase() + bend.slice(1);
+    return bend ? `${st_} ${bend}` : st_;
+  })();
+  const strike = Math.abs(s.offN) < 0.35 ? 'centre' : (s.offN > 0 ? 'toe' : 'heel') + (Math.abs(s.offN) > 0.8 ? ' (thin)' : '');
+  const faceTxt = Math.abs(s.face) < 0.5 ? 'Face square' : `Face ${Math.abs(s.face).toFixed(1)}° ${s.face > 0 ? 'open' : 'closed'}`;
+  const pathTxt = Math.abs(s.path) < 0.5 ? 'path straight' : `path ${Math.abs(s.path).toFixed(1)}° ${s.path > 0 ? 'in-to-out' : 'out-to-in'}`;
+  const offTxt = Math.abs(side) < 1 ? 'on line' : `${fmtLong(Math.abs(side))} ${side > 0 ? 'right' : 'left'}`;
+  const l1 = kind === 'water' ? 'In the water' : kind === 'ob' ? 'Out of bounds'
+    : `${carryDone ? `Carry ${fmtLong(carryDone)} · ` : ''}${s.tree ? 'hit a tree · ' : ''}${fmtLong(Math.hypot(along, side))} total · ${offTxt}`;
+  // Diagram: target is up. Angles exaggerated ×3 so small errors are visible.
+  const X = 3, rad = a => a * X * Math.PI / 180;
+  const px = Math.sin(rad(pr)), py = -Math.cos(rad(pr));
+  const fx = Math.cos(rad(fr)), fy = Math.sin(rad(fr));
+  const svg = `<svg viewBox="-42 -42 84 84"><circle r="40" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.2)"/>
+    <line x1="0" y1="38" x2="0" y2="-38" stroke="rgba(255,255,255,.3)" stroke-dasharray="3 3"/>
+    <line x1="${-px * 30}" y1="${-py * 30}" x2="${px * 26}" y2="${py * 26}" stroke="#5fe08a" stroke-width="3" stroke-linecap="round"/>
+    <path d="M${px * 30} ${py * 30} l${(-px * 8 - py * 5).toFixed(1)} ${(-py * 8 + px * 5).toFixed(1)} M${px * 30} ${py * 30} l${(-px * 8 + py * 5).toFixed(1)} ${(-py * 8 - px * 5).toFixed(1)}" stroke="#5fe08a" stroke-width="3" stroke-linecap="round" fill="none"/>
+    <line x1="${-fx * 18}" y1="${-fy * 18 + 6}" x2="${fx * 18}" y2="${fy * 18 + 6}" stroke="#ffd34d" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="0" cy="0" r="4" fill="#fff"/></svg>`;
+  const el = $('shotCard');
+  el.innerHTML = `${svg}<div><h3>${kind ? (kind === 'water' ? 'Splash' : 'O.B.') : shape}</h3><p class="l1">${s.club} · ${l1}</p>
+    <p>${faceTxt} · ${pathTxt} · ${strike}</p>${s.arc != null ? `<p>Arm swing: ${Math.round(s.arc * 100)} cm</p>` : ''}<p style="font-size:11px">green = path · yellow = face</p></div>`;
+  el.hidden = false; el.style.opacity = 1;
+  clearShotFade();
+}
+
+// ---------- Holes flow ----------
+let holeToken = 0;   // bumps on every (re)start, so a pending "hole done" from before never fires on the new one
+function startHole(i, at = null) {
+  resetMapView();
+  holeToken++;
+  $('scrDone').hidden = true;
+  settings.zoom = 1;
+  holeIdx = i; hole = HOLES[i]; strokes = 0; walkIn = 0; slowT = 0; slowFrom = null; customAim = null; st.aimMode = false;
+  buildHole(i);
+  const p = at || hole.tee;
+  ball.x = p[0]; ball.z = p[1]; ball.vx = ball.vz = 0; ball.hy = ball.vy = 0; ball.state = 'rest'; ball.drop = 0; ball.returnTo = null;
+  ball.teed = surfAt(ball.x, ball.z) === 'tee';
+  lastShot = null; shotInfo = null;
+  traceReset();
+  $('shotCard').hidden = true;
+  st.hitLocked = false;
+  goToBall();
+  leaveSet(); setBlend = 0;
+  autoClub();
+  needAim = true;
+  updateHud();
+  showBanner(i);
+  toast('Choose a club and power, look down at the ball and tap Set.', 3500);
+}
+let bannerTimer = 0;
+function showBanner(i) {
+  const el = $('holeBanner');
+  const pts = [HOLES[i].tee, ...HOLES[i].fairway.pts, HOLES[i].cup];
+  let len = 0; for (let k = 1; k < pts.length; k++) len += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+  el.innerHTML = practice
+    ? `<small>Practice</small><b style="font-size:40px">${practice.label}</b><span>${practice.sub}</span>`
+    : `<small>Hole</small><b>${i + 1}</b><span>${HOLES[i].name} · Par ${HOLES[i].par} · ${fmtLong(len)}</span>`;
+  el.hidden = false; el.style.opacity = 1;
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => { el.style.opacity = 0; bannerTimer = setTimeout(() => (el.hidden = true), 400); }, 2600);
+}
+function holeDone() {
+  leaveSet();
+  const diff = strokes - hole.par;
+  if (practice) {
+    $('doneTitle').textContent = ball.state === 'holed' ? (strokes === 1 ? 'In!' : 'Holed') : 'Picked up';
+    $('doneText').textContent = `${practice.label}: ${strokes} stroke${strokes === 1 ? '' : 's'} to get it in.`;
+    $('scoreTable').innerHTML = '';
+    $('btnNext').textContent = 'Again';
+    $('btnDoneRound').hidden = false;
+  } else {
+    scores[holeIdx] = strokes;
+    const word = ball.state !== 'holed' ? 'Picked up' : strokes === 1 ? 'Hole in one!' : diff <= -3 ? 'Albatross!' : diff === -2 ? 'Eagle!' : diff === -1 ? 'Birdie!' : diff === 0 ? 'Par' : diff === 1 ? 'Bogey' : diff === 2 ? 'Double bogey' : `+${diff}`;
+    $('doneTitle').textContent = word;
+    $('doneText').textContent = `${hole.name}: ${strokes} stroke${strokes === 1 ? '' : 's'} (par ${hole.par}).`;
+    let rows = '<tr><th>Hole</th><th>Par</th><th>Strokes</th></tr>', tp = 0, ts = 0;
+    HOLES.forEach((h, k) => {
+      if (scores[k] == null || k < round.from || k > round.to) return;
+      tp += h.par; ts += scores[k];
+      rows += `<tr><td>${k + 1}. ${h.name}</td><td>${h.par}</td><td>${scores[k]}</td></tr>`;
+    });
+    rows += `<tr><th>Total</th><th>${tp}</th><th>${ts}</th></tr>`;
+    $('scoreTable').innerHTML = rows;
+    $('btnNext').textContent = holeIdx >= round.to ? 'Play again' : 'Next hole';
+    $('btnDoneRound').hidden = true;
+  }
+  $('scrDone').hidden = false;
+}
+$('btnNext').onclick = () => {
+  $('scrDone').hidden = true;
+  if (practice) { startPractice(practice); return; }
+  if (holeIdx >= round.to) startRound(round.from, round.to); else startHole(holeIdx + 1);
+};
+// A round: all 18, the front 9 (holes 1-9) or the back 9 (10-18).
+let round = { from: 0, to: 17, name: '18 holes' };
+function startRound(from = 0, to = HOLES.length - 1) {
+  round = { from, to, name: to - from === 17 ? '18 holes' : from === 0 ? 'Front 9' : 'Back 9' };
+  practice = null; scores.length = 0; startHole(from);
+}
+function startPractice(p) { practice = p; startHole(p.hole, p.at); }
+$('btnDoneRound').onclick = () => { $('scrDone').hidden = true; startRound(0, 17); };
+
+// ---------- Sound ----------
+let actx = null;
+function unlockAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) {} }
+function tone(freq, dur, vol, type = 'sine', when = 0, drop = 0.5) {
+  if (!actx) return;
+  const t0 = actx.currentTime + when, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0); o.frequency.exponentialRampToValueAtTime(freq * drop, t0 + dur);
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(actx.destination); o.start(t0); o.stop(t0 + dur + 0.02);
+}
+function noise(dur, vol, freq, when = 0) {
+  if (!actx) return;
+  const n = Math.floor(actx.sampleRate * dur), buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  s.buffer = buf; f.type = 'bandpass'; f.frequency.value = freq; g.gain.value = vol;
+  s.connect(f).connect(g).connect(actx.destination); s.start(actx.currentTime + when);
+}
+const sfx = {
+  strike: (head, smash) => {
+    const pure = smash > 0.95;
+    if (head === 'driver' || head === 'wood') { tone(2600, 0.05, 0.35, 'triangle'); tone(900, 0.12, pure ? 0.25 : 0.12, 'sine'); }
+    else { tone(3200, 0.03, 0.3, 'square', 0, 0.8); tone(1400, 0.06, pure ? 0.2 : 0.1); }
+    noise(0.25, 0.25, 1800, 0.01);
+  },
+  putt: s => { tone(1800, 0.05, clamp(0.15 + s * 0.08, 0.15, 0.5), 'triangle'); tone(600, 0.08, 0.12); },
+  land: surf => surf === 'sand' ? noise(0.15, 0.3, 500) : tone(160, 0.08, surf === 'green' ? 0.12 : 0.08, 'sine'),
+  tree: () => { noise(0.3, 0.4, 900); tone(220, 0.1, 0.15, 'square'); },
+  splash: () => noise(0.6, 0.5, 700),
+  whoosh: () => noise(0.25, 0.2, 2500),
+  cup: () => { tone(900, 0.06, 0.3, 'triangle'); tone(700, 0.06, 0.25, 'triangle', 0.09); tone(500, 0.12, 0.2, 'triangle', 0.18); },
+  set: () => tone(1200, 0.06, 0.08, 'sine'),
+};
+
+// ---------- Motion input ----------
+let gotEvent = false;
+function onOrientation(e) {
+  if (e.alpha == null && e.beta == null) return;
+  gotEvent = true;
+  onSensor(e.alpha || 0, e.beta || 0, e.gamma || 0, e.timeStamp || performance.now());
+}
+// Desktop fallback: drag to look; Shift+drag (or right-drag) to swing: sideways = swing, up/down = tip (path),
+// Alt+drag = twist (face).
+const desk = { alpha: 0, beta: 20, gamma: 0, on: false, drag: null };
+function deskEmit() { onSensor(desk.alpha, desk.beta, desk.gamma, performance.now()); }
+function enableDesk() {
+  desk.on = true;
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('pointerdown', e => { desk.drag = { x: e.clientX, y: e.clientY, swing: e.shiftKey || e.button === 2, twist: e.altKey }; });
+  window.addEventListener('pointerup', () => (desk.drag = null));
+  window.addEventListener('pointermove', e => {
+    if (!desk.drag) return;
+    const dx = e.clientX - desk.drag.x, dy = e.clientY - desk.drag.y;
+    desk.drag.x = e.clientX; desk.drag.y = e.clientY;
+    if (desk.drag.twist) desk.alpha -= dx * 0.1;
+    else if (desk.drag.swing) { desk.gamma = clamp(desk.gamma + dx * 0.25, -80, 80); desk.beta = clamp(desk.beta + dy * 0.05, -40, 170); }
+    else { desk.alpha -= dx * 0.25; desk.beta = clamp(desk.beta + dy * 0.25, -10, 170); }
+    deskEmit();
+  });
+  setInterval(deskEmit, 50);
+  toast('No motion sensors found. Drag to look, Shift+drag to swing.', 4000);
+}
+let motionOn = false;
+async function enableMotion() {
+  unlockAudio();
+  if (motionOn) return true;
+  const DOE = window.DeviceOrientationEvent;
+  if (DOE && typeof DOE.requestPermission === 'function') {
+    let r;
+    // Ask for tilt and movement together, inside the same tap (iPhone shows one question for both).
+    const DME = window.DeviceMotionEvent;
+    const both = [DOE.requestPermission(), DME && typeof DME.requestPermission === 'function' ? DME.requestPermission() : Promise.resolve('granted')];
+    try { [r] = await Promise.all(both.map(p => p.catch(() => 'error'))); } catch (e) { r = 'error'; }
+    if (r !== 'granted' && !await motionHelp()) return false;
+  }
+  motionOn = true;
+  window.addEventListener('deviceorientation', onOrientation);
+  window.addEventListener('devicemotion', onMotion);
+  try { if (document.documentElement.requestFullscreen && !/iPhone|iPad/.test(navigator.userAgent)) document.documentElement.requestFullscreen().then(applyScreenLock).catch(() => {}); } catch (e) {}
+  keepAwake();
+  setTimeout(() => { if (!gotEvent && !desk.on && !window.__pgNoDesk) enableDesk(); }, 1000);
+  return true;
+}
+const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const IN_APP = IOS && (/FBAN|FBAV|FB_IAB|Instagram|Line\/|Snapchat|GSA\/|LinkedInApp|Twitter|MicroMessenger/.test(navigator.userAgent) || !/Safari\//.test(navigator.userAgent));
+function motionHelp() {
+  return new Promise(resolve => {
+    $('motionWhy').innerHTML = IN_APP
+      ? 'This page opened <b>inside another app</b>, and that app blocks motion. Tap <b>Open in Safari</b> below (or the <b>⋯</b> / share button, then <b>Open in Safari</b>).'
+      : 'Your iPhone probably remembered an earlier <b>Don\'t Allow</b>. Tap <b>Try again</b>. If no question pops up: swipe <b>Safari</b> away to close it completely, then open the link again and tap <b>Allow</b>.';
+    const safari = $('btnOpenSafari');
+    safari.hidden = !IN_APP;
+    safari.href = 'x-safari-' + location.href;
+    $('motionErr').hidden = true;
+    $('scrMotion').hidden = false;
+    const done = ok => { $('scrMotion').hidden = true; resolve(ok); };
+    $('btnMotionRetry').onclick = async () => {
+      let r;
+      try { r = await DeviceOrientationEvent.requestPermission(); } catch (e) { r = 'error'; }
+      if (r === 'granted') { done(true); return; }
+      $('motionErr').textContent = IN_APP ? 'Still blocked: this app won\'t allow it. Open the link in Safari.' : 'Still blocked. Close Safari completely, open the link again and tap Allow.';
+      $('motionErr').hidden = false;
+    };
+    $('btnMotionCancel').onclick = () => done(false);
+  });
+}
+async function begin(fn) {
+  if (!await enableMotion()) return;
+  $('scrStart').hidden = true;
+  for (const id of ['btnGear', 'info']) $(id).hidden = false;
+  st.started = true;
+  fn();
+}
+let wakeLock = null;
+async function keepAwake() { try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && st.started) keepAwake(); });
+
+$('btnClub').onclick = pressClub;
+$('btnMove').onclick = pressMove;
+$('btnBack').onclick = pressBack;
+$('btnMap').onclick = () => toggleMap();
+$('btnPull').onclick = () => setPull(!pull.on);
+function setPull(on) {
+  if (on === pull.on) return;
+  leaveSet();
+  pull.on = on;
+  if (on) {
+    pull.prevScreen = settings.screen;
+    settings.screen = 'landscape';
+    toast('Pulled back. Turn your phone sideways, look down and tap Set.', 3000);
+  } else {
+    settings.screen = pull.prevScreen || store.get('screen', 'portrait');
+    toast('Close-up view', 1000);
+  }
+  applyScreenLock();
+  updateHud();
+}
+$('btnAim').onclick = pressAim;
+$('btnSet').onclick = pressSet;
+$('btnRetake').onclick = pressRetake;
+$('btnBagClose').onclick = () => ($('scrBag').hidden = true);
+$('power').oninput = e => { settings.power = clamp(e.target.value / 100, 0.01, 1); updateHud(); };
+function zoomStep(d) {
+  if (pull.on) return;
+  let i = ZOOMS.indexOf(settings.zoom);
+  if (i < 0) i = 1;
+  i = clamp(i + d, 0, ZOOMS.length - 1);
+  settings.zoom = ZOOMS[i];
+  if (isSet) { computePose(); lockQ.setFromRotationMatrix(new THREE.Matrix4().lookAt(pose.P, pose.P.clone().setY(pose.P.y - 1), stance.A)); }
+  toast(settings.zoom === 1 ? 'Normal view' : settings.zoom < 1 ? 'Closer view' : 'Zoomed out', 900);
+}
+$('btnZoomIn').onclick = () => zoomStep(-1);
+$('btnZoomOut').onclick = () => zoomStep(1);
+
+// ---------- Settings UI ----------
+function bindSeg(id, get, set) {
+  const el = $(id);
+  const paint = () => el.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === get()));
+  el.querySelectorAll('button').forEach(b => (b.onclick = () => { set(b.dataset.v); paint(); }));
+  paint();
+}
+const setHand = v => { if (settings.hand !== v) { settings.hand = v; leaveSet(); setStance(); } store.set('hand', v); };
+const setUnits = v => { settings.units = v; store.set('units', v); updateHud(); };
+const setAcc = v => { settings.acc = v; store.set('acc', v); };
+bindSeg('segHand', () => settings.hand, setHand);
+bindSeg('segUnits', () => settings.units, setUnits);
+function practiceButtons(el, onPick) {
+  el.innerHTML = '';
+  PRACTICE.forEach(p => {
+    const b = document.createElement('button');
+    b.innerHTML = `${p.label}<small>${p.sub}</small>`;
+    b.onclick = () => onPick(p);
+    el.appendChild(b);
+  });
+}
+practiceButtons($('practiceStart'), p => begin(() => startPractice(p)));
+$('btnStart').onclick = () => begin(() => startRound(0, 17));
+$('btnFront9').onclick = () => begin(() => startRound(0, 8));
+$('btnBack9').onclick = () => begin(() => startRound(9, 17));
+$('btnGear').onclick = () => {
+  bindSeg('segHand2', () => settings.hand, setHand);
+  bindSeg('segUnits2', () => settings.units, setUnits);
+  bindSeg('segAcc', () => settings.acc, setAcc);
+  bindSeg('segArm', () => settings.armCheck, v => { settings.armCheck = v; store.set('armCheck', v); });
+  bindSeg('segScreen', () => settings.screen, v => { settings.screen = v; store.set('screen', v); applyScreenLock(); });
+  practiceButtons($('practiceGrid'), p => { $('scrSettings').hidden = true; startPractice(p); });
+  $('scrSettings').hidden = false;
+};
+$('btnCloseSettings').onclick = () => { $('scrSettings').hidden = true; };
+$('btnRound').onclick = () => { $('scrSettings').hidden = true; startRound(0, 17); };
+$('btnRoundF9').onclick = () => { $('scrSettings').hidden = true; startRound(0, 8); };
+$('btnRoundB9').onclick = () => { $('scrSettings').hidden = true; startRound(9, 17); };
+$('btnRestart').onclick = () => { $('scrSettings').hidden = true; practice ? startPractice(practice) : startHole(holeIdx); };
+
+// ---------- Course map ----------
+// A see-through bird's-eye view over the game (the 3D view carries on underneath). It's drawn tee at the
+// bottom and stays put however you turn. Pinch to zoom, drag to slide around, tap to aim there (as far as the
+// club carries). Near the pin = the pin.
+const map = { open: false, cv: $('mapCv'), bg: null, ground: null, key: '', s: 1, cx: 0, cy: 0, mx: 0, mz: 0,
+  baseKey: '', uz: 1, ox: 0, oz: 0, landEdge: null };   // uz/ox/oz: your pinch zoom and drag on top of the fitted view
+function resetMapView() { map.uz = 1; map.ox = 0; map.oz = 0; map.key = ''; }
+function toggleMap(open = !map.open) {
+  map.open = open;
+  $('mapPanel').hidden = !open;
+  $('btnMap').classList.toggle('on', open);
+}
+const toMap = (x, z) => [map.cx + (x - map.mx) * map.s, map.cy + (z - map.mz) * map.s];
+const fromMap = (px, py) => [map.mx + (px - map.cx) / map.s, map.mz + (py - map.cy) / map.s];
+// Fit the hole (tee, fairway, green, hazards, with a margin) into the canvas and paint the parts that don't
+// move: the course itself (the same picture as the 3D ground), trees and the pin. Redone per hole or resize.
+function mapBackground() {
+  const cv = map.cv, dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = Math.max(1, Math.round(cv.clientWidth * dpr)), H = Math.max(1, Math.round(cv.clientHeight * dpr));
+  // Near the green (and not mid-flight), frame just the green and your ball, big enough to read the slopes.
+  const gc = hole.green.c, near = st.view !== 'flight' && Math.hypot(ball.x - gc[0], ball.z - gc[1]) < 60;
+  // Your pinch zoom and drag stay while you line up this shot; every new shot (and hole) starts from the
+  // overview again (resetMapView). The map changing size (e.g. the hint text under it) never resets them.
+  const baseKey = `${holeIdx}:${near ? Math.round(ball.x) + ',' + Math.round(ball.z) : 'hole'}`;
+  if (baseKey !== map.baseKey) { map.baseKey = baseKey; map.uz = 1; map.ox = 0; map.oz = 0; }
+  const key = `${baseKey}:${W}x${H}:${map.uz.toFixed(3)}:${map.ox.toFixed(2)}:${map.oz.toFixed(2)}`;
+  if (map.key === key && map.bg) return;
+  cv.width = W; cv.height = H; map.key = key;
+  const B = hole.bounds, gr = hole.green, m = 22;
+  const xs = [hole.tee[0], gr.c[0] - gr.r[0], gr.c[0] + gr.r[0], ...hole.fairway.pts.map(p => p[0]), ...hole.bunkers.map(b => b.c[0]), ...hole.water.map(w => w.c[0])];
+  const zs = [hole.tee[1], gr.c[1] - gr.r[1], gr.c[1] + gr.r[1], ...hole.fairway.pts.map(p => p[1])];
+  let x0 = Math.min(...xs) - m, x1 = Math.max(...xs) + m, z0 = Math.min(...zs) - m, z1 = Math.max(...zs) + m * 0.6;
+  if (near) {
+    const R = Math.max(...gr.r) * 1.25;
+    x0 = Math.min(gc[0] - R, ball.x - 3); x1 = Math.max(gc[0] + R, ball.x + 3);
+    z0 = Math.min(gc[1] - R, ball.z - 3); z1 = Math.max(gc[1] + R, ball.z + 3);
+  }
+  const pad = 8 * dpr;
+  map.s0 = Math.min((W - 2 * pad) / (x1 - x0), (H - 2 * pad) / (z1 - z0));
+  map.mx0 = (x0 + x1) / 2; map.mz0 = (z0 + z1) / 2;
+  map.s = map.s0 * map.uz; map.mx = map.mx0 + map.ox; map.mz = map.mz0 + map.oz; map.cx = W / 2; map.cy = H / 2;
+  const bg = document.createElement('canvas'); bg.width = W; bg.height = H;
+  const g = bg.getContext('2d');
+  g.fillStyle = '#3a7032'; g.fillRect(0, 0, W, H);
+  if (map.ground) {
+    const [ax, ay] = toMap(B.x0, B.z0), [bx, by] = toMap(B.x1, B.z1);
+    g.drawImage(map.ground, ax, ay, bx - ax, by - ay);
+  }
+  g.fillStyle = 'rgba(16, 52, 24, .85)';
+  for (const t of trees) {
+    const [px, py] = toMap(t.x, t.z);
+    if (px < -10 || py < -10 || px > W + 10 || py > H + 10) continue;
+    g.beginPath(); g.arc(px, py, Math.max(1.5 * dpr, 2.4 * t.s * map.s), 0, Math.PI * 2); g.fill();
+  }
+  const [hx, hy] = toMap(hole.cup[0], hole.cup[1]);
+  g.strokeStyle = '#fff'; g.lineWidth = 1.5 * dpr; g.beginPath(); g.moveTo(hx, hy); g.lineTo(hx, hy - 16 * dpr); g.stroke();
+  g.fillStyle = '#e53935'; g.beginPath(); g.moveTo(hx, hy - 16 * dpr); g.lineTo(hx + 11 * dpr, hy - 12.5 * dpr); g.lineTo(hx, hy - 9 * dpr); g.fill();
+  g.fillStyle = '#0b0f0c'; g.beginPath(); g.arc(hx, hy, 2.5 * dpr, 0, Math.PI * 2); g.fill();
+  map.bg = bg;
+}
+const canAimFromMap = () => st.started && st.view !== 'flight' && ball.state === 'rest' && !st.hitLocked;
+function drawMap() {
+  mapBackground();
+  const cv = map.cv, g = cv.getContext('2d'), dpr = cv.width / Math.max(1, cv.clientWidth);
+  g.clearRect(0, 0, cv.width, cv.height);
+  g.drawImage(map.bg, 0, 0);
+  const [bx, by] = toMap(ball.x, ball.z);
+  if (canAimFromMap()) {
+    // How far this club can carry (dashed ring), your line, and where it lands at this power.
+    if (!isPutter()) {
+      g.setLineDash([4 * dpr, 5 * dpr]); g.lineWidth = 1.5 * dpr; g.strokeStyle = 'rgba(255,255,255,.55)';
+      g.beginPath(); g.arc(bx, by, plannedCarry(clubIdx, 1) * map.s, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+    }
+    const [tx, tz] = customAim || aimTarget(), [ax, ay] = toMap(tx, tz);
+    g.setLineDash([6 * dpr, 5 * dpr]); g.lineWidth = 2 * dpr; g.strokeStyle = customAim ? '#ffd34d' : 'rgba(255,255,255,.85)';
+    g.beginPath(); g.moveTo(bx, by); g.lineTo(ax, ay); g.stroke(); g.setLineDash([]);
+    if (!isPutter()) {
+      const [lx, ly] = toMap(landPos.x, landPos.z);
+      g.strokeStyle = '#ffd34d'; g.lineWidth = 2.5 * dpr;
+      g.beginPath(); g.arc(lx, ly, Math.max(9 * dpr, 4 * map.s), 0, Math.PI * 2); g.stroke();
+      g.fillStyle = mapTouch.ring ? 'rgba(255, 211, 77, .55)' : 'rgba(255, 211, 77, .25)'; g.fill();
+      if (mapTouch.ring) {
+        // While you hold it: the line carried on out to the club's full range.
+        const L = Math.hypot(landPos.x - ball.x, landPos.z - ball.z) || 1, R = plannedCarry(clubIdx, 1);
+        const [fx, fy] = toMap(ball.x + (landPos.x - ball.x) / L * R, ball.z + (landPos.z - ball.z) / L * R);
+        g.strokeStyle = 'rgba(255, 211, 77, .5)'; g.lineWidth = 1.5 * dpr; g.setLineDash([3 * dpr, 4 * dpr]);
+        g.beginPath(); g.moveTo(bx, by); g.lineTo(fx, fy); g.stroke(); g.setLineDash([]);
+      }
+      // Off the edge of the map (say a full wedge while the map is zoomed on the green): a yellow arrow on the
+      // edge points to it, with the distance. It can be grabbed and dragged in just like the circle.
+      map.landEdge = null;
+      const m = 16 * dpr, W = cv.width, H = cv.height;
+      if (lx < m || lx > W - m || ly < m || ly > H - m) {
+        const ox = clamp(bx, m, W - m), oy = clamp(by, m, H - m);
+        let dx = lx - ox, dy = ly - oy;
+        const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+        const t = Math.min(dx > 0 ? (W - m - ox) / dx : dx < 0 ? (m - ox) / dx : Infinity,
+                           dy > 0 ? (H - m - oy) / dy : dy < 0 ? (m - oy) / dy : Infinity);
+        const ex = ox + dx * t, ey = oy + dy * t, a = Math.atan2(dy, dx), r = 11 * dpr;
+        map.landEdge = [ex, ey];
+        g.fillStyle = '#ffd34d'; g.strokeStyle = '#1b1600'; g.lineWidth = 1.5 * dpr;
+        g.beginPath();
+        g.moveTo(ex + Math.cos(a) * r, ey + Math.sin(a) * r);
+        g.lineTo(ex + Math.cos(a + 2.4) * r, ey + Math.sin(a + 2.4) * r);
+        g.lineTo(ex + Math.cos(a - 2.4) * r, ey + Math.sin(a - 2.4) * r);
+        g.closePath(); g.fill(); g.stroke();
+        const txt = fmtLong(plannedCarry());
+        g.font = `700 ${11 * dpr}px system-ui, sans-serif`;
+        const tw = g.measureText(txt).width + 8 * dpr, tx = clamp(ex - Math.cos(a) * 26 * dpr - tw / 2, 2, W - tw - 2), ty = clamp(ey - Math.sin(a) * 22 * dpr - 8 * dpr, 2, H - 18 * dpr);
+        g.fillStyle = 'rgba(27, 22, 0, .85)'; g.fillRect(tx, ty, tw, 16 * dpr);
+        g.fillStyle = '#ffd34d'; g.fillText(txt, tx + 4 * dpr, ty + 12 * dpr);
+      }
+    }
+  }
+  // While it's in the air: a faint ring where it's heading to come down.
+  if (ball.state === 'flight' && flight.lx != null) {
+    const [lx, ly] = toMap(flight.lx, flight.lz);
+    g.strokeStyle = 'rgba(255, 211, 77, .7)'; g.lineWidth = 1.5 * dpr;
+    g.beginPath(); g.arc(lx, ly, Math.max(5 * dpr, 6 * map.s), 0, Math.PI * 2); g.stroke();
+  }
+  // The shot you just hit, while it flies and rolls.
+  if (traceN > 1) {
+    const p = traceGeo.attributes.position;
+    g.strokeStyle = 'rgba(255, 243, 176, .9)'; g.lineWidth = 2 * dpr; g.beginPath();
+    for (let i = 0; i < traceN; i++) { const [px, py] = toMap(p.getX(i), p.getZ(i)); i ? g.lineTo(px, py) : g.moveTo(px, py); }
+    g.stroke();
+  }
+  if (ball.state !== 'holed' && ball.state !== 'gone') {
+    g.fillStyle = '#fff'; g.strokeStyle = '#111'; g.lineWidth = 1.5 * dpr;
+    g.beginPath(); g.arc(bx, by, 4.5 * dpr, 0, Math.PI * 2); g.fill(); g.stroke();
+  }
+  // You: where you're standing and which way you're looking.
+  if (st.view !== 'flight') {
+    const a = awayDir(camera.quaternion), [ex, ey] = toMap(camera.position.x, camera.position.z);
+    if (a) {
+      const ang = Math.atan2(a.z, a.x);
+      g.fillStyle = 'rgba(95, 224, 138, .35)';
+      g.beginPath(); g.moveTo(ex, ey); g.arc(ex, ey, 30 * dpr, ang - 0.45, ang + 0.45); g.closePath(); g.fill();
+    }
+    g.fillStyle = '#5fe08a'; g.strokeStyle = '#062a13'; g.lineWidth = 2 * dpr;
+    g.beginPath(); g.arc(ex, ey, 4 * dpr, 0, Math.PI * 2); g.fill(); g.stroke();
+  }
+  $('mapHint').textContent = !canAimFromMap() ? '' : isPutter() ? 'Pinch to zoom · drag to move · tap to aim'
+    : mapTouch.ring ? `Lands ${fmtLong(plannedCarry())} · power ${Math.round(settings.power * 100)}%` : 'Drag the yellow circle to aim · pinch to zoom';
+}
+// Aim from a map position (also used by the test hook). It only sets the line; the power stays yours.
+function aimFromMap(x, z, quiet = false) {
+  if (!canAimFromMap()) return false;
+  if (surfAt(x, z) === 'ob') { if (!quiet) toast('Tap on the course', 1200); return false; }
+  st.aimMode = false; st.aiming = false;
+  leaveSet();
+  let d = Math.hypot(x - ball.x, z - ball.z);
+  const max = isPutter() ? Infinity : plannedCarry(clubIdx, 1);
+  if (d > max) { x = ball.x + (x - ball.x) / d * max; z = ball.z + (z - ball.z) / d * max; d = max; }
+  const toCup = Math.hypot(x - hole.cup[0], z - hole.cup[1]);
+  customAim = toCup < (isPutter() ? 0.5 : 3) ? null : [x, z];
+  turnStance();
+  updateHud();
+  if (quiet) return true;
+  const dt = customAim ? d : Math.hypot(hole.cup[0] - ball.x, hole.cup[1] - ball.z);
+  toast(isPutter() ? (customAim ? 'Aim set. Look down at the ball and tap Set.' : 'Aiming at the pin. Look down at the ball and tap Set.')
+    : `${customAim ? 'Aim set' : 'Aiming at the pin'}: ${fmtLong(dt)} away. Set the power to match, then tap Set.`, 3000);
+  return true;
+}
+// Touch on the map: one finger taps to aim or drags to slide; two fingers pinch to zoom (about the point
+// between them). A tap only aims if the finger didn't move and no pinch happened. Pressing on the yellow
+// landing circle grabs it instead (see dragLanding).
+const mapTouch = { pts: new Map(), moved: false, pinched: false, start: null, pinch: null, ring: false };
+function onLandingCircle(p) {
+  if (!canAimFromMap() || isPutter()) return false;
+  const [lx, ly] = toMap(landPos.x, landPos.z), k = map.cv.width / Math.max(1, map.cv.clientWidth);
+  if (map.landEdge && Math.hypot(p[0] - map.landEdge[0], p[1] - map.landEdge[1]) < 30 * k) return true;   // the edge arrow
+  return Math.hypot(p[0] - lx, p[1] - ly) < Math.max(26 * k, 4 * map.s + 14 * k);
+}
+function dragLanding(p) {
+  let [x, z] = fromMap(...p);
+  const full = plannedCarry(clubIdx, 1);
+  let d = Math.hypot(x - ball.x, z - ball.z);
+  if (d < 1) return;
+  if (d > full) { x = ball.x + (x - ball.x) / d * full; z = ball.z + (z - ball.z) / d * full; d = full; }
+  if (surfAt(x, z) === 'ob') return;
+  leaveSet();
+  customAim = [x, z];
+  settings.power = clamp(d / full, 0.01, 1);
+  turnStance();
+  updateHud();
+}
+const mapPx = e => { const k = map.cv.width / Math.max(1, map.cv.clientWidth); return [e.offsetX * k, e.offsetY * k]; };
+map.cv.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  try { map.cv.setPointerCapture(e.pointerId); } catch (err) {}
+  const T = mapTouch;
+  T.pts.set(e.pointerId, mapPx(e));
+  if (T.pts.size === 1) {
+    T.moved = false; T.pinched = false; T.start = { p: mapPx(e), ox: map.ox, oz: map.oz };
+    T.ring = onLandingCircle(mapPx(e));
+  }
+  if (T.pts.size === 2) T.ring = false;
+  if (T.pts.size === 2) {
+    const [a, b] = [...T.pts.values()], mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    T.pinched = true;
+    T.pinch = { d0: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, uz0: map.uz, world: fromMap(...mid) };
+  }
+});
+map.cv.addEventListener('pointermove', e => {
+  const T = mapTouch;
+  if (!T.pts.has(e.pointerId)) return;
+  T.pts.set(e.pointerId, mapPx(e));
+  if (T.pts.size >= 2 && T.pinch) {
+    const [a, b] = [...T.pts.values()], mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    map.uz = clamp(T.pinch.uz0 * Math.hypot(a[0] - b[0], a[1] - b[1]) / T.pinch.d0, 1, 14);
+    // Keep the spot between your fingers under your fingers.
+    const s = map.s0 * map.uz;
+    map.ox = T.pinch.world[0] - (mid[0] - map.cx) / s - map.mx0;
+    map.oz = T.pinch.world[1] - (mid[1] - map.cy) / s - map.mz0;
+  } else if (T.pts.size === 1 && T.ring && !T.pinched) {
+    dragLanding(mapPx(e)); T.moved = true;
+  } else if (T.pts.size === 1 && T.start && !T.pinched) {
+    const p = mapPx(e), dx = p[0] - T.start.p[0], dy = p[1] - T.start.p[1];
+    if (Math.hypot(dx, dy) > 8 * (map.cv.width / Math.max(1, map.cv.clientWidth))) T.moved = true;
+    if (T.moved) { map.ox = T.start.ox - dx / map.s; map.oz = T.start.oz - dy / map.s; }
+  }
+});
+function mapPointerEnd(e) {
+  const T = mapTouch;
+  if (!T.pts.has(e.pointerId)) return;
+  const p = T.pts.get(e.pointerId);
+  T.pts.delete(e.pointerId);
+  if (T.pts.size === 0) {
+    if (T.ring && T.moved) toast(`Lands ${fmtLong(plannedCarry())} · power ${Math.round(settings.power * 100)}%. Look down and tap Set.`, 2400);
+    else if (!T.moved && !T.pinched && !T.ring && e.type === 'pointerup') aimFromMap(...fromMap(...p));
+    T.ring = false;
+    T.start = null; T.pinch = null;
+  } else if (T.pts.size === 1) {
+    // Back to one finger after a pinch: carry on dragging from here, but never aim.
+    const [q] = [...T.pts.values()];
+    T.start = { p: q, ox: map.ox, oz: map.oz }; T.pinch = null;
+  }
+}
+map.cv.addEventListener('pointerup', mapPointerEnd);
+map.cv.addEventListener('pointercancel', mapPointerEnd);
+
+// ---------- Per-frame ----------
+const _ray = new V3();
+// March a ray from the camera to the ground.
+function rayGround(maxT = 700) {
+  const o = camera.position, d = _ray.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  if (d.y > -0.005) return null;
+  for (let t = 0.3; t < maxT; t += Math.max(0.03, t * 0.006)) {
+    const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t;
+    if (y <= ter(x, z)) return new V3(x, ter(x, z), z);
+  }
+  return null;
+}
+const ringSize = (m, p) => m.scale.setScalar(clamp(camera.position.distanceTo(p) * 0.025, 0.12, 6));
+function updateRing() {
+  ring.visible = st.aiming;
+  if (!st.aiming) return;
+  const hit = rayGround();
+  ringOk = !!hit && surfAt(hit.x, hit.z) !== 'ob';
+  if (!hit) { ring.visible = false; return; }
+  ring.position.set(hit.x, hit.y + 0.02, hit.z);
+  ringSize(ring, ring.position);
+  ring.material.color.set(ringOk ? 0x5fe08a : 0xff6b5e);
+}
+function updateAimRing() {
+  aimRing.visible = false;
+  aimHitOk = false;
+  if (!st.aimMode) return;
+  const hit = rayGround();
+  if (!hit) return;
+  // A full club can only aim as far as it carries.
+  const max = isPutter() ? MAX_PUTT * 2 : plannedCarry(clubIdx, 1);
+  const dx = hit.x - ball.x, dz = hit.z - ball.z, L = Math.hypot(dx, dz);
+  if (L > max) { hit.x = ball.x + dx / L * max; hit.z = ball.z + dz / L * max; hit.y = ter(hit.x, hit.z); }
+  aimHit.copy(hit); aimHitOk = true;
+  aimRing.visible = true;
+  aimRing.position.set(hit.x, hit.y + 0.02, hit.z);
+  ringSize(aimRing, aimRing.position);
+  aimRing.material.color.set(L > max ? 0xff9a3c : 0xffd34d);
+  $('aimLabel').textContent = `Lock ${isPutter() ? fmtShort(Math.min(L, max)) : fmtLong(Math.min(L, max))}`;
+}
+// Where this club and power lands on a pure strike.
+const landPos = new V3();
+function updateLandRing() {
+  const show = st.started && !isPutter() && ball.state === 'rest' && (st.view === 'ball' || st.view === 'scout') && !st.aimMode;
+  landRing.visible = tgtDot.visible = show;
+  if (!show) return;
+  const c = plannedCarry();
+  landPos.set(ball.x + stance.T.x * c, 0, ball.z + stance.T.z * c);
+  landPos.y = ter(landPos.x, landPos.z);
+  landRing.position.set(landPos.x, landPos.y + 0.03, landPos.z);
+  landRing.scale.setScalar(Math.max(0.8, c * 0.025));
+  tgtDot.position.set(landPos.x, landPos.y + 0.4, landPos.z);
+}
+
+const _gripOff = new V3();
+function placeClub() {
+  const show = st.started && st.view !== 'flight' && st.view !== 'scout' && st.atBall && ball.state !== 'holed';
+  for (const h of Object.values(HEADS)) h.g.visible = false;
+  clubGroup.visible = show;
+  if (!show) return;
+  const H = curHead();
+  H.g.visible = true;
+  const op = clubOpacity(pose.elev);
+  for (const m of clubMats) { m.opacity = op; m.depthWrite = op > 0.99; }
+  shadowMat.opacity = op * setBlend;
+  H.g.position.copy(pose.H);
+  H.g.quaternion.copy(pose.headQ);
+  H.hosel.position.z = heelZ();
+  const top = hoselTop().applyQuaternion(pose.headQ).add(pose.H);
+  const hands = eyeH() > CAM_H * 1.01
+    ? top.clone().addScaledVector(UP, 0.8).addScaledVector(stance.A, -0.35)
+    : _gripOff.set(0, -0.055, -0.14).applyQuaternion(camera.quaternion).add(camera.position);
+  hands.addScaledVector(stance.T, GRIP_SWING * pose.sin * setBlend);
+  const up = new V3().subVectors(hands, top);
+  const grip = top.clone().addScaledVector(up.normalize(), Math.min(1.15, hands.distanceTo(top)));
+  const dir = new V3().subVectors(top, grip), len = dir.length();
+  shaft.position.copy(grip).addScaledVector(dir, 0.5);
+  shaft.quaternion.setFromUnitVectors(UP, dir.normalize());
+  shaft.scale.set(1, len, 1);
+}
+
+// Camera: over the ball (phone-driven), or following the ball through the air.
+const fcam = { pos: new V3(), look: new V3(), dir: new V3() };
+function updateCamera(dt) {
+  if (st.view === 'flight') {
+    const bp = ballMesh.position;
+    const want = bp.clone().addScaledVector(fcam.dir, -9).add(new V3(0, 3.2, 0));
+    want.y = Math.max(want.y, ter(want.x, want.z) + 1.4);
+    fcam.pos.lerp(want, 1 - Math.exp(-dt * 6));
+    fcam.look.lerp(bp, 1 - Math.exp(-dt * 12));
+    camera.position.copy(fcam.pos);
+    camera.lookAt(fcam.look);
+    return;
+  }
+  camera.position.copy(pose.P);
+  camera.quaternion.slerpQuaternions(Qv, lockQ, camMix);
+}
+function startFlightCam() {
+  st.view = 'flight';
+  fcam.pos.copy(camera.position);
+  fcam.look.copy(ballMesh.position);
+  fcam.dir.copy(flight.D || stance.T);
+}
+
+// Edge-of-screen pointers.
+// Keep a pointer's label fully on screen (it's centred under the arrow, which can sit at the very edge).
+function fitLabel(label, x) {
+  const half = label.offsetWidth / 2 || 40;
+  label.style.left = clamp(x, half + 4, appW - half - 4) + 'px';
+}
+const _p = new V3();
+function pointTo(el, label, world, text) {
+  _p.copy(world).applyMatrix4(camera.matrixWorldInverse);
+  const behind = _p.z > 0;
+  const ndc = world.clone().project(camera);
+  if (!behind && Math.abs(ndc.x) < 0.92 && Math.abs(ndc.y) < 0.92) { el.hidden = label.hidden = true; return; }
+  let sx = _p.x, sy = _p.y;
+  if (behind) { sx = -sx; sy = -sy; }
+  const ang = Math.atan2(-sy, sx);
+  const w = appW, h = appH, m = 44, top = 100, bottom = 190;
+  const cx = w / 2, cy = (top + h - bottom) / 2;
+  const k = Math.min((w / 2 - m) / Math.abs(Math.cos(ang) || 1e-6), ((h - top - bottom) / 2) / Math.abs(Math.sin(ang) || 1e-6));
+  const x = cx + Math.cos(ang) * k, y = cy + Math.sin(ang) * k;
+  el.style.left = x + 'px'; el.style.top = y + 'px';
+  el.style.transform = `rotate(${ang}rad)`;
+  label.style.left = x + 'px'; label.style.top = y + 'px';
+  label.textContent = text;
+  fitLabel(label, x);
+  el.hidden = label.hidden = false;
+}
+function pointAlongShot(el, label, ground, text) {
+  const w = appW, h = appH, m = 44, top = 100, bottom = 190;
+  const toPx = v => [(v.x + 1) / 2 * w, (1 - v.y) / 2 * h];
+  const inFront = v => v.clone().applyMatrix4(camera.matrixWorldInverse).z < 0;
+  const tN = ground.clone().project(camera);
+  if (inFront(ground) && Math.abs(tN.x) < 0.92 && Math.abs(tN.y) < 0.92) { el.hidden = label.hidden = true; return; }
+  const b = new V3(ball.x, ter(ball.x, ball.z), ball.z);
+  const dx0 = ground.x - b.x, dz0 = ground.z - b.z, L = Math.hypot(dx0, dz0) || 1;
+  const via = new V3(b.x + dx0 / L * 0.3, ter(b.x + dx0 / L * 0.3, b.z + dz0 / L * 0.3), b.z + dz0 / L * 0.3);
+  const [ax, ay0] = toPx(b.clone().project(camera)), [bx, by] = toPx(via.clone().project(camera));
+  if (!inFront(b) || !inFront(via) || ax < m || ax > w - m || ay0 < 0 || ay0 > h) { pointTo(el, label, ground, text); return; }
+  const ay = clamp(ay0, top, h - bottom);
+  let dx = bx - ax, dy = by - ay;
+  const len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
+  const cands = [dx > 1e-6 ? (w - m - ax) / dx : dx < -1e-6 ? (m - ax) / dx : Infinity,
+                 dy > 1e-6 ? (h - bottom - ay) / dy : dy < -1e-6 ? (top - ay) / dy : Infinity].filter(v => v > 1);
+  const t = cands.length ? Math.min(...cands) : 0;
+  const x = ax + dx * t, y = ay + dy * t;
+  el.style.left = x + 'px'; el.style.top = y + 'px';
+  el.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
+  label.style.left = x + 'px'; label.style.top = y + 'px';
+  label.textContent = text;
+  fitLabel(label, x);
+  el.hidden = label.hidden = false;
+}
+const _pinPos = new V3();
+function updatePointers() {
+  const ids = ['ballPtr', 'ballPtrLabel', 'tgtPtr', 'tgtPtrLabel', 'pinPtr', 'pinPtrLabel'];
+  if (!st.started || st.view === 'flight' || ball.state === 'holed' || ball.state === 'gone') { ids.forEach(id => ($(id).hidden = true)); return; }
+  pointTo($('ballPtr'), $('ballPtrLabel'), ballMesh.position, `Ball ${fmtLong(camera.position.distanceTo(ballMesh.position))}`);
+  const pin = Math.hypot(ball.x - hole.cup[0], ball.z - hole.cup[1]);
+  const pinTxt = `Pin ${pin < 40 ? fmtShort(pin) : fmtLong(pin)}`;
+  if (!isPutter() && landRing.visible) {
+    // Yellow on the shot line: where this club and power lands. Red: the pin, when you're aiming elsewhere.
+    // Both are placed along the line from the ball: over a long hole the ground rises and falls by more than
+    // your eye height, which throws off a plain direction-from-centre pointer.
+    pointAlongShot($('tgtPtr'), $('tgtPtrLabel'), landPos, `Lands ${fmtLong(plannedCarry())}` + (customAim ? '' : ` · ${pinTxt}`));
+    // Only one edge arrow: with your own line set, the flag's arrow would sit on top of it (user asked), so
+    // it's hidden; aiming at the pin, the one arrow carries both distances.
+    $('pinPtr').hidden = $('pinPtrLabel').hidden = true;
+  } else {
+    $('tgtPtr').hidden = $('tgtPtrLabel').hidden = true;
+    const [tx, tz] = customAim || hole.cup;
+    _pinPos.set(tx, ter(tx, tz) + (customAim ? 0.3 : 0.6), tz);
+    pointAlongShot($('pinPtr'), $('pinPtrLabel'), _pinPos, customAim ? `Aim ${fmtShort(Math.hypot(ball.x - tx, ball.z - tz))}` : pinTxt);
+  }
+}
+
+let slowT = 0, slowFrom = null;
+function tick(dt) {
+  // Putts: Pocket Putt's slow motion after the first yard.
+  if (slowFrom && ball.state === 'rolling' && Math.hypot(ball.x - slowFrom[0], ball.z - slowFrom[1]) >= SLOWMO_AFTER) { slowFrom = null; slowT = SLOWMO_TIME; }
+  if (ball.state !== 'rolling') slowFrom = null;
+  let simDt = dt;
+  if (slowT > 0) {
+    slowT -= dt;
+    const left = Math.max(0, slowT);
+    simDt = dt * (left > 0.25 ? SLOWMO_SPEED : lerp(1, SLOWMO_SPEED, left / 0.25));
+  }
+  if (ball.state === 'flight') stepFlight(simDt);
+  const n = Math.ceil(simDt / (1 / 480));
+  for (let i = 0; i < n; i++) stepRoll(simDt / n);
+  if (flightCamIn > 0) { flightCamIn -= dt; if (flightCamIn <= 0 && (ball.state === 'flight' || ball.state === 'rolling')) startFlightCam(); }
+  walkToBall(dt);
+  stepShotFade(dt);
+  if (ball.state === 'holed') ball.drop = Math.min(0.08, ball.drop + dt * 0.35);
+  setBlend = clamp(setBlend + (isSet ? 1 : -1) * dt / 0.2, 0, 1);
+  camMix = clamp(camMix + (camLocked ? 1 : -1) * dt / 0.25, 0, 1);
+  updateQv();
+  computePose();
+  placeBallMesh();
+  updateCamera(dt);
+  camera.updateMatrixWorld();
+  placeClub();
+  updateRing();
+  updateAimRing();
+  updateLandRing();
+  pinDot.visible = st.started && camera.position.distanceTo(pinDot.position) > (pull.on ? 4 : 25);
+  updatePointers();
+  updateFloating();
+  if (!$('mapPanel').hidden) drawMap();
+  renderer.clear();
+  renderer.render(scene, camera);
+  renderer.clearDepth();
+  renderer.render(clubScene, camera);
+}
+let lastT = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+  tick(dt);
+  requestAnimationFrame(frame);
+}
+hole = HOLES[0];
+buildHole(0);
+ball.x = hole.tee[0]; ball.z = hole.tee[1];
+origin.set(0, ter(0, 0), 0);
+placeBallMesh();
+requestAnimationFrame(frame);
+
+// Test hook: drive the game without a phone.
+window.__pg = {
+  sensor: (a, b, g, t) => onSensor(a, b, g, t ?? performance.now()),
+  step: (sec, fps = 60) => { for (let i = 0; i < sec * fps; i++) tick(1 / fps); },
+  state: () => ({ st: { ...st }, ball: { ...ball }, strokes, isSet, setBlend, sin: pose.sin, lat: pose.lat, delta: addr && addr.delta, club: club().name, power: settings.power, surf: surfAt(ball.x, ball.z), cam: camera.position.toArray() }),
+  hole: (i, at) => startHole(i, at), practice: i => startPractice(PRACTICE[i]), round: startRound,
+  pressSet, pressAim, pressMove, pressRetake, chooseClub, setPower: p => { settings.power = p; updateHud(); },
+  begin: () => begin(startRound), flight, shotInfo: () => shotInfo, settings,
+  debug: { camera, ballMesh, scene, pose, ter, surfAt, HOLES, ellR },
+  motion: (a, w, t) => onMotion({ acceleration: { x: a, y: 0, z: 0 }, rotationRate: { alpha: 0, beta: 0, gamma: w * 180 / Math.PI }, timeStamp: t }), aimFromMap: (x, z) => aimFromMap(x, z), toggleMap, map, pressMove, pressBack, mapTouch, setPull, pull, landPos, onLandingCircle, toMap,
+};
+</script>
+</body>
+</html>
